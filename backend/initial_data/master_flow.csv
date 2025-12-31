@@ -1,0 +1,5 @@
+block_code,block_name,folder_name,next_block_code
+BLOCK_P,前处理车间,01_PreTreatment,BLOCK_E
+BLOCK_E,提取纯化车间,02_Extraction,BLOCK_C
+BLOCK_C,制剂成型车间,03_Preparation,BLOCK_B
+BLOCK_B,内包外包车间,04_Packaging,

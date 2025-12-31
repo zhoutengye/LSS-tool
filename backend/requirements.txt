@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pandas
+numpy
+scipy
+pydantic
+networkx    # 图论分析
+pgmpy       # 贝叶斯网络 (PDF 6.2节核心)
+pymoo       # 多目标优化 (PDF 6.1节核心)
+# torch     # (GCN以后再装，先不加太大)

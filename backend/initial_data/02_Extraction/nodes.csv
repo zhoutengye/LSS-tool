@@ -1,0 +1,13 @@
+code,name,type
+E01,纯化水制备系统,Unit
+E02,乙醇调配罐,Unit
+E03,投料站,Unit
+E04,醇提罐1(三七),Unit
+E06,水提罐1(药渣),Unit
+E10,多功能提取罐(甘松/挥发油),Unit
+E12,水提罐3(党参黄精),Unit
+E05,板框过滤器1,Unit
+E16,提取液储罐(合并),Unit
+E17,双效浓缩器1,Unit
+E19,醇沉罐,Unit
+E21,单效浓缩器(收膏),Unit

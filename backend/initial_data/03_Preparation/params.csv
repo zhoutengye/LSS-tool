@@ -1,0 +1,11 @@
+node,param,name,role,unit,usl,lsl,is_material,data_type
+C01,mesh,粉碎细度,Control,mesh,80,,FALSE,Scalar
+C03,w_sucrose,蔗糖重量,Input,kg,520,516,TRUE,Scalar
+C03,w_dextrin,糊精重量,Input,kg,105,95,TRUE,Scalar
+C04,mix_time,混合时间,Control,min,15,10,FALSE,Scalar
+C05,in_temp,进风温度,Control,℃,95,85,FALSE,Scalar
+C05,out_temp,出风温度,Control,℃,40,30,FALSE,Scalar
+C05,spray_rate,喷液速度,Control,rpm,50,40,FALSE,Scalar
+C05,moisture,颗粒水分,Output,%,3.0,1.0,FALSE,Scalar
+C07,uniformity,混合均匀度(RSD),Output,%,3.0,,FALSE,Scalar
+C07,yield_granule,颗粒收率,Output,%,99,97,TRUE,Scalar

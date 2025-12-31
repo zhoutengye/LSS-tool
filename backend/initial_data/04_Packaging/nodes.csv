@@ -1,0 +1,11 @@
+code,name,type
+B01,铝塑泡罩包装机,Unit
+B02,视觉检测系统,Unit
+B03,自动装盒机,Unit
+B04,电子监管码赋码机,Unit
+B05,在线检重秤,Unit
+B06,热收缩膜包装机,Unit
+B07,自动装箱机,Unit
+B08,码垛机器人,Unit
+B09,成品仓库,Unit
+B_REJECT,废品剔除槽,Unit

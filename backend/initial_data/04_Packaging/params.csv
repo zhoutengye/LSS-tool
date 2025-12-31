@@ -1,0 +1,11 @@
+node,param,name,role,unit,usl,lsl,is_material,data_type
+B01,temp_seal,热封温度,Control,℃,150,140,FALSE,Scalar
+B01,speed,冲裁速度,Control,cpm,40,30,FALSE,Scalar
+B01,air_press,成型气压,Control,MPa,0.6,0.4,FALSE,Scalar
+B02,camera_sens,视觉灵敏度,Control,%,95,,FALSE,Scalar
+B02,reject_cnt,剔除数量,Output,count,10,,TRUE,Scalar
+B04,code_grade,赋码等级,Output,grade,,,FALSE,Scalar
+B05,weight_box,药盒重量,Output,g,55,52,FALSE,Scalar
+B07,box_count,装箱数量,Control,count,40,40,TRUE,Scalar
+B09,temp_store,成品库温度,Control,℃,20,,FALSE,Scalar
+B09,humid_store,成品库湿度,Control,RH%,75,,FALSE,Scalar
