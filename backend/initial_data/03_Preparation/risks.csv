@@ -1,0 +1,11 @@
+code,name,category,prob
+GRAN_FAIL,流化床制粒异常,Top,
+GRAN_FAC_E,制粒设备因素,Equipment,
+GRAN_FAC_M,制粒物料因素,Material,
+GRAN_E1,滤袋堵塞,Equipment,0.08
+GRAN_E2,温度传感器异常,Equipment,0.02
+GRAN_E3,蠕动泵异常,Equipment,0.05
+GRAN_E4,鼓风机故障,Equipment,0.03
+GRAN_E5,喷枪堵塞,Equipment,0.10
+GRAN_M1,浸膏密度异常,Material,0.05
+GRAN_M2,粉末用量异常,Material,0.05

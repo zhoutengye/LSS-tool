@@ -1,13 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
-import ReactFlow, { 
-  Controls, 
-  Background, 
-  applyEdgeChanges, 
-  applyNodeChanges, 
-  addEdge 
+import ReactFlow, {
+  Controls,
+  Background,
+  applyEdgeChanges,
+  applyNodeChanges,
+  addEdge
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Modal, Form, InputNumber, message, Button, Tag } from 'antd';
+import { Modal, Form, InputNumber, message, Button, Tag, Drawer, Tree, Space } from 'antd';
 import axios from 'axios';
 
 export default function ProcessFlow() {
@@ -36,6 +36,11 @@ export default function ProcessFlow() {
   const [editingNode, setEditingNode] = useState(null);
   const [form] = Form.useForm();
 
+  // 风险面板状态
+  const [isRiskDrawerOpen, setIsRiskDrawerOpen] = useState(false);
+  const [riskData, setRiskData] = useState(null);
+  const [selectedNodeForRisk, setSelectedNodeForRisk] = useState(null);
+
   // React Flow 基础回调
   const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
@@ -45,16 +50,23 @@ export default function ProcessFlow() {
   const onNodeClick = useCallback((event, node) => {
     console.log('点击节点:', node); // 调试日志
 
+    // 右键点击 Unit 节点打开风险面板
+    if (event.type === 'contextmenu' && node.data.type === 'Unit') {
+      event.preventDefault();
+      showRiskPanel(node);
+      return;
+    }
+
     if (node.data.type === 'Block') {
       const isExpanded = expandedBlocks.has(node.id);
       console.log('区块展开状态:', isExpanded); // 调试日志
       const newExpanded = new Set(expandedBlocks);
 
       if (isExpanded) {
-        // 折叠：移除该区块的所有子节点
+        // 折叠：移除该区块的 Unit 子节点，保留 Resource 节点
         console.log('折叠区块'); // 调试日志
         newExpanded.delete(node.id);
-        setNodes((nds) => nds.filter(n => n.data.parentId !== node.id));
+        setNodes((nds) => nds.filter(n => n.data.parentId !== node.id || n.data.type === 'Resource'));
         setEdges((eds) => eds.filter(e => {
           const sourceNode = nodes.find(n => n.id === e.source);
           const targetNode = nodes.find(n => n.id === e.target);
@@ -69,7 +81,8 @@ export default function ProcessFlow() {
         axios.get('http://127.0.0.1:8000/api/graph/structure')
           .then(res => {
             console.log('API返回节点数:', res.data.nodes.length); // 调试日志
-            const childNodes = res.data.nodes.filter(n => n.data.parentId === node.id);
+            // 只添加 Unit 类型的子节点，Resource 节点已经在初始加载时添加了
+            const childNodes = res.data.nodes.filter(n => n.data.parentId === node.id && n.data.type === 'Unit');
             console.log('子节点数:', childNodes.length); // 调试日志
 
             // 只添加子节点之间的连线，不包括区块间的主流程连线
@@ -120,6 +133,19 @@ export default function ProcessFlow() {
     }
   }, [expandedBlocks]);
 
+  // 打开风险分析面板
+  const showRiskPanel = async (node) => {
+    setSelectedNodeForRisk(node);
+    try {
+      const res = await axios.get(`http://127.0.0.1:8000/api/graph/nodes/${node.data.code}/risks`);
+      setRiskData(res.data.risks);
+      setIsRiskDrawerOpen(true);
+    } catch (err) {
+      message.error('获取风险数据失败');
+      console.error(err);
+    }
+  };
+
   // 双击节点：打开设置弹窗（只对 Unit 节点）
   const onNodeDoubleClick = (event, node) => {
     // 区块节点不打开弹窗
@@ -160,9 +186,10 @@ export default function ProcessFlow() {
         if (node.id === editingNode.id) {
           // 如果得率太低(<90)，把框变红
           const color = result_yield < 90 ? 'red' : '#1890ff';
+          const displayLabel = `${node.data.code}\n${node.data.name}\n得率: ${result_yield}%`;
           node.style = { ...node.style, borderColor: color, borderWidth: 2 };
-          node.data = { ...node.data, ...values, label: `${node.data.label}\n得率: ${result_yield}%` };
-          
+          node.data = { ...node.data, ...values, label: displayLabel };
+
           if (result_yield < 90) message.warning(`警告：仿真得率仅为 ${result_yield}%`);
           else message.success(`仿真成功：得率 ${result_yield}%`);
         }
@@ -185,6 +212,7 @@ export default function ProcessFlow() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onNodeContextMenu={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
         fitView
       >
@@ -193,7 +221,7 @@ export default function ProcessFlow() {
       </ReactFlow>
 
       <Modal
-        title={`🔧 工艺参数配置 - ${editingNode?.data?.label || ''}`}
+        title={`🔧 工艺参数配置 - ${editingNode?.data?.code || ''} ${editingNode?.data?.name || ''}`}
         open={isModalOpen}
         onOk={handleOk}
         onCancel={() => setIsModalOpen(false)}
@@ -234,6 +262,63 @@ export default function ProcessFlow() {
           <p>此节点暂无可配置参数</p>
         )}
       </Modal>
+
+      <Drawer
+        title={`⚠️ 风险分析 - ${selectedNodeForRisk?.data?.code || ''} ${selectedNodeForRisk?.data?.name || ''}`}
+        placement="right"
+        width={500}
+        open={isRiskDrawerOpen}
+        onClose={() => setIsRiskDrawerOpen(false)}
+      >
+        {riskData && riskData.length > 0 ? (
+          <div>
+            <p style={{ marginBottom: 16, color: '#666' }}>
+              该工艺节点可能涉及以下风险因素：
+            </p>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {riskData.map(risk => (
+                <div
+                  key={risk.code}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    backgroundColor: risk.category === 'Top' ? '#fff1f0' : '#fafafa'
+                  }}
+                >
+                  <div style={{ marginBottom: 8 }}>
+                    <Tag
+                      color={
+                        risk.category === 'Top' ? 'red' :
+                        risk.category === 'Equipment' ? 'blue' :
+                        risk.category === 'Material' ? 'green' :
+                        risk.category === 'Environment' ? 'cyan' :
+                        risk.category === 'Human' ? 'purple' :
+                        risk.category === 'Method' ? 'orange' : 'default'
+                      }
+                    >
+                      {risk.category}
+                    </Tag>
+                    <span style={{ fontWeight: 500, marginLeft: 8 }}>
+                      {risk.name}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    代码: {risk.code}
+                    {risk.base_probability !== null && risk.base_probability !== undefined && (
+                      <span style={{ marginLeft: 16 }}>
+                        发生概率: <strong>{(risk.base_probability * 100).toFixed(1)}%</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </Space>
+          </div>
+        ) : (
+          <p style={{ color: '#999' }}>暂无相关风险数据</p>
+        )}
+      </Drawer>
     </div>
   );
 }

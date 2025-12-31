@@ -35,11 +35,13 @@
 
    - **L3 逻辑层 (RiskNode/RiskEdge)**：定义故障树和因果关系
 
-     - 风险分类：人/机/料/法/环
+     - **故障树层级**：Top 事件 → Category 因素 → Basic 底事件
 
-     - 贝叶斯先验概率：支持风险推理计算
+     - **风险分类**：人/机/料/法/环 (Human/Equipment/Material/Environment/Method)
 
-     - 因果关系：参数异常 → 风险节点
+     - **贝叶斯先验概率**：支持风险推理计算
+
+     - **因果关系**：参数异常 → 风险节点
 
 2. **数据引擎 (The Data)**：系统的"血液"
 
@@ -503,7 +505,208 @@
         B2 --> B3
         B3 --> B4
 
-3.2 前处理车间设备示例
+3.2 CSV 数据结构规范
+~~~~~~~~~~~~~~~~~~~~
+
+每个车间的数据存储在独立文件夹中，包含以下 CSV 文件：
+
+**1. nodes.csv - 节点定义**
+
+定义车间内的所有节点（Unit/Resource）。
+
+.. code-block:: text
+
+   code,name,type
+   P01_IN,原料入库(AGV),Unit
+   P02_OUT,库存出库(AGV),Unit
+   P_ENV,前处理环境监测,Resource
+
+**字段说明**：
+
+- ``code``: 节点代码（唯一标识符）
+- ``name``: 节点名称
+- ``type``: 节点类型
+  - ``Block``: 车间层级（仅在 master_flow.csv 中定义）
+  - ``Unit``: 工艺设备单元
+  - ``Resource``: 基础设施（如环境监测）
+
+**2. params.csv - 参数定义**
+
+定义每个节点的工艺参数（CPP/CQA）。
+
+.. code-block:: text
+
+   node,param,name,role,unit,target,usl,lsl,is_material,data_type
+   E03,w_sanqi,三七投料量,Input,g,100,102,98,TRUE,Scalar
+   E03,temp,提取温度,Control,℃,85,90,80,FALSE,Scalar
+   E21,yield,浸膏得率,Output,%,98,100,95,TRUE,Scalar
+
+**字段说明**：
+
+- ``node``: 所属节点代码
+- ``param``: 参数代码（节点内唯一）
+- ``name``: 参数名称
+- ``role``: 参数角色
+  - ``Input``: 输入物料参数
+  - ``Control``: 工艺控制参数
+  - ``Output``: 质量输出参数
+- ``unit``: 计量单位
+- ``target``: 目标值
+- ``usl``: 上规格限
+- ``lsl``: 下规格限
+- ``is_material``: 是否为物料参数（TRUE/FALSE）
+- ``data_type``: 数据类型
+  - ``Scalar``: 标量值
+  - ``Spectrum``: 光谱/指纹图谱
+  - ``Image``: 图像数据
+  - ``grade``: 等级/分类
+
+**3. flows.csv - 管路连接**
+
+定义节点之间的物料流向关系（支持跨车间连接）。
+
+.. code-block:: text
+
+   source,target,name
+   P01_IN,P02_OUT,库存管理
+   P03_WEIGH1,E03,党参/甘松/黄精直接去投料
+   E21,C04,稠膏去制剂混合
+
+**字段说明**：
+
+- ``source``: 源节点代码
+- ``target``: 目标节点代码
+- ``name``: 连线名称（物料描述）
+
+**跨车间连接**：
+
+- 支持直接连接到其他车间的 Unit 节点（如 ``P05_WEIGH2 → C04``）
+- 所有节点在导入时已创建，因此跨车间引用不会失败
+
+**4. risks.csv - 风险节点定义**
+
+定义故障树的风险节点（按车间组织）。
+
+.. code-block:: text
+
+   code,name,category,prob
+   EXT_FAIL,提取过程故障,Top,
+   EXT_FAC_E,提取设备因素,Equipment,
+   EXT_E1,温度传感器异常,Equipment,0.02
+   EXT_M1,药材掺有杂质,Material,0.05
+   EXT_H1,操作人员不熟练,Human,0.15
+
+**字段说明**：
+
+- ``code``: 风险节点代码（前缀标识车间，如 ``EXT_``=提取车间）
+- ``name``: 风险名称
+- ``category``: 风险分类
+  - ``Top``: 顶层故障事件
+  - ``Equipment``: 设备因素
+  - ``Material``: 物料因素
+  - ``Human``: 人员因素
+  - ``Environment``: 环境因素
+  - ``Method``: 方法/法规因素
+- ``prob``: 基础发生概率（0-1 之间的浮点数，空值表示未定义）
+
+**故障树层级**：
+
+.. code-block:: text
+
+   Top 事件（如 EXT_FAIL）
+     ├─ Category 因素（如 EXT_FAC_E）
+     │   ├─ Basic 底事件（如 EXT_E1: 温度传感器异常, prob=0.02）
+     │   └─ Basic 底事件（如 EXT_E2: 液位计故障, prob=0.01）
+     ├─ Category 因素（如 EXT_FAC_M）
+     └─ ...
+
+**5. risk_edges.csv - 风险因果关系**
+
+定义故障树中节点之间的因果连接。
+
+.. code-block:: text
+
+   source,target
+   EXT_E1,EXT_FAC_E
+   EXT_E2,EXT_FAC_E
+   EXT_FAC_E,EXT_FAIL
+
+**字段说明**：
+
+- ``source``: 原因节点代码（子节点）
+- ``target``: 结果节点代码（父节点）
+
+**边的方向**：从底事件指向顶事件（如：``EXT_E1 → EXT_FAC_E → EXT_FAIL``）
+
+**数据导入逻辑**：
+
+系统采用**两阶段导入策略**（``seed.py``）：
+
+1. **Phase 1 - 构建节点**:
+   - 读取所有车间的 ``nodes.csv``
+   - 创建所有 Block、Unit、Resource 节点
+   - 此时跨车间引用的目标节点已存在
+
+2. **Phase 2 - 填充细节**:
+   - 读取 ``params.csv``：为节点添加参数定义
+   - 读取 ``flows.csv``：建立管路连接（包括跨车间连接）
+   - 读取 ``risks.csv`` + ``risk_edges.csv``：构建故障树
+
+**优势**：
+
+- 支持任意复杂的跨车间物料流向
+- 避免因节点不存在而导致的连线失败
+- 易于扩展新车间
+
+3.3 风险分析功能
+~~~~~~~~~~~~~~~~
+
+系统集成了故障树分析（FTA）功能，支持工艺节点的风险评估。
+
+**故障树结构**：
+
+.. mermaid::
+   :align: center
+
+   graph TB
+       EXT_FAIL[EXT_FAIL<br/>提取过程故障<br/>Top]
+       EXT_FAC_E[EXT_FAC_E<br/>提取设备因素<br/>Equipment]
+       EXT_FAC_M[EXT_FAC_M<br/>提取物料因素<br/>Material]
+       EXT_E1[EXT_E1<br/>温度传感器异常<br/>p=0.02]
+       EXT_E2[EXT_E2<br/>液位计故障<br/>p=0.01]
+       EXT_M1[EXT_M1<br/>药材掺有杂质<br/>p=0.05]
+
+       EXT_E1 --> EXT_FAC_E
+       EXT_E2 --> EXT_FAC_E
+       EXT_M1 --> EXT_FAC_M
+       EXT_FAC_E --> EXT_FAIL
+       EXT_FAC_M --> EXT_FAIL
+
+**风险数据统计**（当前系统）：
+
+- **提取车间** (02_Extraction)：
+  - 42 个风险节点（3 个 Top 事件）
+  - 38 条风险因果关系边
+  - 覆盖提取、浓缩、醇沉工艺
+
+- **制剂车间** (03_Preparation)：
+  - 10 个风险节点（1 个 Top 事件）
+  - 9 条风险因果关系边
+  - 覆盖制粒工艺
+
+**前端交互**：
+
+- 右键点击 Unit 节点，打开风险分析面板
+- 面板显示该工序相关的所有风险节点
+- 风险分类用颜色标签区分（Top/Equipment/Material 等）
+- 底事件显示发生概率
+
+**API 端点**：
+
+- ``GET /api/graph/risks/tree``: 获取完整故障树
+- ``GET /api/graph/nodes/{node_code}/risks``: 获取节点相关风险
+
+3.4 前处理车间设备示例
 ~~~~~~~~~~~~~~~~~~~~~~
 
 以前处理车间为例，展示 CSV 数据文件的实际结构。
@@ -556,14 +759,6 @@
         P05 --> E[去提取车间]
 
         B1 --> P_ENV[P_ENV<br/>环境监测]
-
-3.3 其他车间
-^^^^^^^^^^^^
-
-其他车间（提取纯化、制剂成型、内包外包）的结构类似，通过 CSV 文件定义：
-- 每个车间有独立的文件夹：``02_Extraction/``, ``03_Preparation/``, ``04_Packaging/``
-- 文件夹内包含 ``nodes.csv``, ``flows.csv``, ``params.csv``
-- 通过 ``seed.py`` 统一加载到数据库
 
 
 4. 数据流转全流程

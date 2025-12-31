@@ -100,9 +100,10 @@ def get_graph_structure(db: Session = Depends(get_db)):
     # 构建节点映射 (code -> id)
     code_to_id = {node.code: node.id for node in nodes}
 
-    # 分离区块和单元
+    # 分离区块、单元和资源
     blocks = [n for n in nodes if n.node_type == "Block"]
     units = [n for n in nodes if n.node_type == "Unit"]
+    resources = [n for n in nodes if n.node_type == "Resource"]
 
     flow_nodes = []
     flow_edges = []
@@ -113,8 +114,9 @@ def get_graph_structure(db: Session = Depends(get_db)):
         flow_nodes.append({
             "id": str(block.id),
             "data": {
-                "label": block.name,
+                "label": f"{block.code}\n{block.name}",
                 "code": block.code,
+                "name": block.name,
                 "type": "Block",
                 "params": [],
                 "isExpanded": False,
@@ -145,8 +147,9 @@ def get_graph_structure(db: Session = Depends(get_db)):
             flow_nodes.append({
                 "id": str(unit.id),
                 "data": {
-                    "label": unit.name,
+                    "label": f"{unit.code}\n{unit.name}",
                     "code": unit.code,
+                    "name": unit.name,
                     "type": "Unit",
                     "parentId": str(unit.parent_id),
                     "hidden": True,
@@ -173,6 +176,46 @@ def get_graph_structure(db: Session = Depends(get_db)):
                 },
                 "className": "unit-node",
                 "hidden": True
+            })
+
+    # Resource 节点（环境监测等）默认可见，放在画布右上角
+    for idx, resource in enumerate(resources):
+        # 找到父区块
+        parent_block = next((b for b in blocks if b.id == resource.parent_id), None)
+        if parent_block:
+            parent_idx = blocks.index(parent_block)
+            base_x = 50 + parent_idx * 500
+
+            flow_nodes.append({
+                "id": str(resource.id),
+                "data": {
+                    "label": f"{resource.code}\n{resource.name}",
+                    "code": resource.code,
+                    "name": resource.name,
+                    "type": "Resource",
+                    "parentId": str(resource.parent_id),
+                    "params": [
+                        {
+                            "code": p.code,
+                            "name": p.name,
+                            "unit": p.unit,
+                            "role": p.role,
+                            "usl": p.usl,
+                            "lsl": p.lsl,
+                            "target": p.target
+                        }
+                        for p in resource.params
+                    ]
+                },
+                "position": {"x": base_x + 10, "y": -100},  # 放在区块上方居中
+                "style": {
+                    "width": 180,
+                    "border": "2px solid #faad14",
+                    "background": "#fffbe6",
+                    "borderRadius": "8px",
+                    "fontSize": "14px"
+                },
+                "className": "resource-node"
             })
 
     # 连线（Unit 之间的流向）
@@ -210,3 +253,78 @@ def get_graph_structure(db: Session = Depends(get_db)):
         })
 
     return {"nodes": flow_nodes, "edges": flow_edges}
+
+
+@app.get("/api/graph/risks/tree")
+def get_risk_tree(db: Session = Depends(get_db)):
+    """获取完整的故障树结构
+
+    返回所有风险节点和因果关系边，用于前端构建故障树可视化。
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        包含 risks 和 edges 的字典
+    """
+    risks = db.query(models.RiskNode).all()
+    edges = db.query(models.RiskEdge).all()
+
+    risk_nodes = [{
+        "id": risk.id,
+        "code": risk.code,
+        "name": risk.name,
+        "category": risk.category,
+        "base_probability": risk.base_probability
+    } for risk in risks]
+
+    risk_edges = [{
+        "id": f"r{edge.id}",
+        "source": edge.source_code,
+        "target": edge.target_code,
+        "animated": True,
+        "style": {"stroke": "#ff4d4f", "strokeWidth": 2}
+    } for edge in edges]
+
+    return {"risks": risk_nodes, "edges": risk_edges}
+
+
+@app.get("/api/graph/nodes/{node_code}/risks")
+def get_node_risks(node_code: str, db: Session = Depends(get_db)):
+    """获取指定节点的相关风险
+
+    根据节点编码（如 E04, C05）查找相关的风险节点。
+
+    Args:
+        node_code: 节点编码
+        db: 数据库会话
+
+    Returns:
+        该节点相关的风险列表
+    """
+    # 查询所有风险节点
+    all_risks = db.query(models.RiskNode).all()
+
+    # 根据节点编码匹配相关风险
+    # 提取车间节点 (E01-E21) 匹配 EXT_*, CONC_*, PREC_*
+    # 制剂车间节点 (C01-C09) 匹配 GRAN_*
+    related_risks = []
+    for risk in all_risks:
+        if node_code.startswith('E') and risk.code.startswith(('EXT_', 'CONC_', 'PREC_')):
+            related_risks.append({
+                "id": risk.id,
+                "code": risk.code,
+                "name": risk.name,
+                "category": risk.category,
+                "base_probability": risk.base_probability
+            })
+        elif node_code.startswith('C') and risk.code.startswith('GRAN_'):
+            related_risks.append({
+                "id": risk.id,
+                "code": risk.code,
+                "name": risk.name,
+                "category": risk.category,
+                "base_probability": risk.base_probability
+            })
+
+    return {"risks": related_risks}

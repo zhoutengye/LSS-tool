@@ -1,6 +1,8 @@
 source,target,name
 P01_IN,P02_OUT,库存管理
 P02_OUT,P03_WEIGH1,原料领用
-P03_WEIGH1,P04_CRUSH,三七/琥珀投料
+P03_WEIGH1,E03,党参/甘松/黄精直接去投料
+P03_WEIGH1,P04_CRUSH,三七/琥珀去粉碎
 P04_CRUSH,P05_WEIGH2,粉末收集
-P05_WEIGH2,BLOCK_E,合格粉末去提取
+P05_WEIGH2,E03,三七粉去投料
+P05_WEIGH2,C04,琥珀细粉去制剂混合

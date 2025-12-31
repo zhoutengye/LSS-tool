@@ -1,7 +1,7 @@
 code,name,type
-P01_IN,原料入库(AGV),Unit
-P02_OUT,库存出库(AGV),Unit
-P03_WEIGH1,称重1 (P3电子秤),Unit
-P04_CRUSH,粉碎 (P4粉碎机),Unit
-P05_WEIGH2,称重2 (P5电子秤),Unit
-P_ENV,前处理环境监测,Unit
+P01_IN,原料入库(P1),Unit
+P02_OUT,库存出库(P2),Unit
+P03_WEIGH1,称重1(P3),Unit
+P04_CRUSH,粉碎(P4),Unit
+P05_WEIGH2,称重2(P5),Unit
+P_ENV,前处理车间环境,Resource

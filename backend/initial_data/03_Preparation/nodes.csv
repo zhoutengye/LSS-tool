@@ -1,11 +1,11 @@
 code,name,type
 C01,辅料粉碎机,Unit
-C02,振动筛,Unit
+C02,振动筛(80目),Unit
 C03,配料电子秤,Unit
 C04,湿法混合机,Unit
 C05,流化床制粒机,Unit
-C06,整粒机,Unit
+C06,整粒机(16目),Unit
 C07,多向运动总混机,Unit
-C08,中间站(IPC),Unit
+C08,中间站(IPC取样),Unit
 C09,内包缓冲罐,Unit
-C_WASTE,除尘回收系统,Unit
+C_ENV,制剂车间环境,Resource
