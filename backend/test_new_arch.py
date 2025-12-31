@@ -68,8 +68,20 @@ def test_architecture():
     # 从知识图谱中获取 temp 参数的规格 (假设 USL=90, LSL=75)
     usl = 90.0
     lsl = 75.0
+    target = 82.5
 
-    result = SPCToolbox.calculate_capability(data_values, usl, lsl)
+    # 使用正确的 API：实例化 + run() 方法
+    spc_tool = SPCToolbox()
+    config = {
+        "usl": usl,
+        "lsl": lsl,
+        "target": target
+    }
+    analysis_result = spc_tool.run(data_values, config)
+
+    # 提取结果
+    result = analysis_result["result"]
+    metrics = analysis_result["metrics"]
 
     print(f"  平均值: {result['mean']}℃")
     print(f"  标准差: {result['std']}")
@@ -87,12 +99,16 @@ def test_architecture():
 
     print(f"  过程能力等级: {grade}")
 
+    # 显示警告信息
+    if analysis_result["warnings"]:
+        print(f"  ⚠️  警告: {', '.join(analysis_result['warnings'])}")
+
     # ============================================================
     # 步骤 5: 报警判定
     # ============================================================
     print("\n🚨 步骤 5: 实时报警判定...")
     for temp in data_values:
-        status = SPCToolbox.check_rules(temp, usl, lsl)
+        status = spc_tool.check_rules(temp, usl, lsl)
         status_emoji = "✅" if status == "NORMAL" else "⚠️"
         print(f"  {status_emoji} {temp}℃ -> {status}")
 
