@@ -5,10 +5,10 @@
 
 import numpy as np
 from typing import Dict, List, Optional
-from .base import BaseTool
+from core.base import BaseTool
 
 
-class SPCToolbox(BaseTool):
+class SPCTool(BaseTool):
     """统计过程控制工具箱
 
     提供标准的 SPC 分析功能，属于第一层"描述性统计"工具。

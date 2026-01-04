@@ -5,7 +5,7 @@
 
 from typing import Dict, Optional
 from .base import BaseTool
-from .spc_tools import SPCToolbox
+from tools.descriptive.spc import SPCTool
 
 
 class ToolRegistry:
@@ -96,7 +96,7 @@ def register_all_tools():
     """注册所有可用工具"""
 
     # 第一层：描述性统计 (Descriptive)
-    registry.register("spc", SPCToolbox())
+    registry.register("spc", SPCTool())
 
     # TODO: 未来添加更多工具
     # registry.register("pareto", ParetoTool())
