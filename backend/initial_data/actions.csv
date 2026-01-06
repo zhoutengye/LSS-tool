@@ -1,0 +1,12 @@
+code,name,risk_code,target_role,instruction_template,priority,category,estimated_impact,active
+ACTION_E04_TEMP_HIGH,E04温度偏高-操作工对策,R_E04_TEMP_HIGH,Operator,检测到{node_name}温度异常（当前{current_value}℃，标准{target_value}℃），建议将蒸汽阀开度从{current_valve}%调至{suggested_valve}%，HIGH,Equipment,预计Cpk提升至1.33以上,True
+ACTION_E04_TEMP_HIGH_QA,E04温度偏高-QA对策,R_E04_TEMP_HIGH,QA,{node_name}温度Cpk={cpk}低于临界值1.33，请对批次{batch_id}启动偏差调查流程,HIGH,Method,确保质量风险可控,True
+ACTION_E04_TEMP_HIGH_LEADER,E04温度偏高-班长对策,R_E04_TEMP_HIGH,TeamLeader,{node_name}温度异常，根因分析显示{root_cause}概率为{prob}%，请安排设备检修,METHOD,Equipment,恢复过程稳定性,True
+ACTION_E04_TEMP_LOW,E04温度偏低-操作工对策,R_E04_TEMP_LOW,Operator,检测到{node_name}温度偏低（{current_value}℃），建议加大蒸汽阀开度5-10%,MEDIUM,Equipment,防止提取效率下降,True
+ACTION_E04_PRESSURE_HIGH,E04压力偏高-操作工对策,R_E04_PRESSURE_HIGH,Operator,{node_name}压力超限（{current_value}bar），请检查排气阀是否卡滞,HIGH,Equipment,避免设备损坏,True
+ACTION_E04_TIME_SHORT,E04提取时间不足-操作工对策,R_E04_TIME_SHORT,Operator,{node_name}提取时间不足（{current_value}min），建议延长至{suggested_value}min,MEDIUM,Method,确保有效成分提取充分,True
+ACTION_P01_MOISTURE_HIGH,P01水分偏高-QA对策,R_P01_MOISTURE_HIGH,QA,批次{batch_id}颗粒水分超标（{current_value}%），请启动OOS调查并隔离该批次产品,CRITICAL,Quality,防止不合格品流入下工序,True
+ACTION_P01_MOISTURE_HIGH_LEADER,P01水分偏高-班长对策,R_P01_MOISTURE_HIGH,TeamLeader,颗粒水分偏高，根因分析指向{root_cause}，建议调整干燥温度至{suggested_temp}℃,HIGH,Method,恢复正常水分控制,True
+ACTION_MATERIAL_VARIATION,原料波动-班长对策,R_MATERIAL_VARIATION,TeamLeader,{material_name}原料质量波动较大（批号{supplier_batch}），建议启用备用配方参数：{backup_params},MEDIUM,Material,保证产品质量稳定性,True
+ACTION_EQUIPMENT_ABNORMAL,设备异常-操作工对策,R_EQUIPMENT_ABNORMAL,Operator,{node_name}设备运行异常（{error_code}），请立即停机检查并通知维修工,CRITICAL,Equipment,避免设备损坏和质量事故,True
+ACTION_CPK_TREND_DOWN,Cpk趋势下滑-经理对策,R_CPK_TREND_DOWN,Manager,本月{node_name}工序Cpk呈下滑趋势（{cpk_trend}），建议本周安排设备保养和工艺参数优化,MEDIUM,Method,防止质量风险累积,True

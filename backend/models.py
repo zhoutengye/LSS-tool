@@ -299,3 +299,141 @@ class Measurement(Base):
     source_type = Column(String, doc="数据源: 'HISTORY', 'SIMULATION', 'SENSOR'")
 
     batch = relationship("Batch", back_populates="measurements", doc="关联批次")
+
+
+# ==========================================
+# 指挥决策系统 (Command & Action System)
+# ==========================================
+
+class ActionDef(Base):
+    """对策方案定义（OCAP - Out of Control Action Plan）
+
+    当检测到异常时，系统自动推送的标准化应对措施。
+    这是连接"分析"与"行动"的桥梁。
+
+    业务场景：
+        - 操作工收到："E04温度偏高，请将蒸汽阀开度从50%调至45%"
+        - QA收到："BATCH-001水分异常，请启动OOS调查流程"
+        - 班长收到："党参原料波动较大，建议启用备用配方参数"
+
+    Attributes:
+        id: 主键
+        code: 对策代码（唯一标识）
+        name: 对策名称
+        risk_code: 关联的风险节点代码
+        target_role: 目标角色（"Operator"/"QA"/"TeamLeader"/"Manager"）
+        instruction_template: 指令模板（支持变量替换）
+        priority: 优先级（"CRITICAL"/"HIGH"/"MEDIUM"/"LOW"）
+        category: 对策类别（"Equipment"/"Material"/"Method"/"Man"/"Environment"）
+        estimated_impact: 预期效果描述
+        active: 是否启用
+
+    Example:
+        >>> action = ActionDef(
+        ...     code="ACTION_E04_TEMP_HIGH",
+        ...     name="E04温度偏高对策",
+        ...     risk_code="R_E04_TEMP_HIGH",
+        ...     target_role="Operator",
+        ...     instruction_template="检测到{node_name}温度异常（当前{current_value}℃），建议将蒸汽阀开度调至{suggested_value}%",
+        ...     priority="HIGH",
+        ...     category="Equipment"
+        ... )
+    """
+    __tablename__ = "meta_actions"
+
+    id = Column(Integer, primary_key=True, doc="主键")
+    code = Column(String, unique=True, index=True, doc="对策代码")
+
+    # 基本信息
+    name = Column(String, doc="对策名称")
+    risk_code = Column(String, ForeignKey("meta_risk_nodes.code"), doc="关联的风险代码")
+    target_role = Column(String, doc="目标角色: Operator/QA/TeamLeader/Manager")
+
+    # 核心字段：指令模板（支持自然语言生成）
+    instruction_template = Column(String, doc="指令模板，支持 {node}, {value} 等变量")
+
+    # 对策属性
+    priority = Column(String, default="MEDIUM", doc="优先级: CRITICAL/HIGH/MEDIUM/LOW")
+    category = Column(String, doc="对策类别: Equipment/Material/Method/Man/Environment")
+    estimated_impact = Column(String, doc="预期效果描述")
+
+    # 状态控制
+    active = Column(Boolean, default=True, doc="是否启用")
+
+    # 元数据
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, doc="创建时间")
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, doc="更新时间")
+
+
+class DailyInstruction(Base):
+    """每日指令记录表
+
+    记录系统每日自动生成的行动指令，用于：
+    1. 次日清晨推送到对应角色的终端
+    2. 追踪指令的执行状态（Pending/Read/Done）
+    3. 积累历史数据，优化对策效果
+
+    业务价值：
+        - 不是"生成报告"，而是"推送任务"
+        - 支持事后追溯：为什么当时发了这个指令？
+        - 闭环管理：指令是否被执行？效果如何？
+
+    Attributes:
+        id: 主键
+        instruction_date: 指令生成日期
+        target_date: 针对哪一天的生产数据
+        role: 目标角色
+        content: 指令内容（自然语言）
+        status: 状态（Pending/Read/Done/Cancelled）
+        priority: 优先级
+        evidence: 证据数据（JSON，存储Cpk、风险概率等）
+        action_code: 关联的对策方案代码
+        batch_id: 关联的批次ID（如果针对特定批次）
+        node_code: 关联的工序节点代码
+        sent_at: 推送时间
+        read_at: 阅读时间
+        done_at: 完成时间
+        feedback: 执行反馈（操作工的实际执行结果）
+
+    Example:
+        >>> instruction = DailyInstruction(
+        ...     target_date="2023-10-25",
+        ...     role="Operator",
+        ...     content="E04温度异常，建议将蒸汽阀开度调至45%",
+        ...     evidence={"cpk": 0.85, "current_temp": 85.5},
+        ...     action_code="ACTION_E04_TEMP_HIGH"
+        ... )
+    """
+    __tablename__ = "data_instructions"
+
+    id = Column(Integer, primary_key=True, doc="主键")
+
+    # 时间维度
+    instruction_date = Column(DateTime, default=datetime.datetime.utcnow, doc="指令生成时间")
+    target_date = Column(String, index=True, doc="针对的生产日期 (YYYY-MM-DD)")
+
+    # 核心内容
+    role = Column(String, index=True, doc="目标角色: Operator/QA/TeamLeader/Manager")
+    content = Column(String, doc="指令内容（自然语言）")
+    status = Column(String, default="Pending", doc="状态: Pending/Read/Done/Cancelled")
+
+    priority = Column(String, doc="优先级: CRITICAL/HIGH/MEDIUM/LOW")
+
+    # 证据链（为什么发这个指令？）
+    evidence = Column(JSON, doc="证据数据: {cpk, risk_prob, current_value, ...}")
+    action_code = Column(String, ForeignKey("meta_actions.code"), doc="关联的对策代码")
+
+    # 关联维度
+    batch_id = Column(String, ForeignKey("data_batches.id"), nullable=True, doc="关联批次ID")
+    node_code = Column(String, nullable=True, doc="关联工序节点代码")
+    param_code = Column(String, nullable=True, doc="关联参数代码")
+
+    # 生命周期追踪
+    sent_at = Column(DateTime, nullable=True, doc="实际推送时间")
+    read_at = Column(DateTime, nullable=True, doc="阅读时间")
+    done_at = Column(DateTime, nullable=True, doc="完成时间")
+    feedback = Column(String, nullable=True, doc="执行反馈（操作工填写）")
+
+    # 关联
+    batch = relationship("Batch", doc="关联批次")
+    action_def = relationship("ActionDef", doc="关联对策定义")

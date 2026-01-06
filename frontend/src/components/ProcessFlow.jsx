@@ -10,7 +10,7 @@ import 'reactflow/dist/style.css';
 import { Modal, Form, InputNumber, message, Button, Tag, Drawer, Tree, Space } from 'antd';
 import axios from 'axios';
 
-export default function ProcessFlow() {
+export default function ProcessFlow({ isLiveMode = false, onNodeSelect = null }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [expandedBlocks, setExpandedBlocks] = useState(new Set()); // 记录哪些区块已展开
@@ -49,6 +49,11 @@ export default function ProcessFlow() {
   // 点击区块：展开/折叠
   const onNodeClick = useCallback((event, node) => {
     console.log('点击节点:', node); // 调试日志
+
+    // 通知父组件：节点被选中（用于右侧监控面板）
+    if (onNodeSelect && node.data.type === 'Unit') {
+      onNodeSelect(node);
+    }
 
     // 右键点击 Unit 节点打开风险面板
     if (event.type === 'contextmenu' && node.data.type === 'Unit') {
@@ -146,7 +151,7 @@ export default function ProcessFlow() {
     }
   };
 
-  // 双击节点：打开设置弹窗（只对 Unit 节点）
+  // 双击节点：根据模式执行不同操作
   const onNodeDoubleClick = (event, node) => {
     // 区块节点不打开弹窗
     if (node.data.type === 'Block') {
@@ -154,6 +159,17 @@ export default function ProcessFlow() {
     }
 
     console.log('双击节点:', node); // 调试日志
+
+    // 实时模式：选中节点用于监控面板（只读）
+    if (isLiveMode) {
+      if (onNodeSelect) {
+        onNodeSelect(node);
+        message.info(`已选中 ${node.data.code} - 查看右侧监控面板`);
+      }
+      return;
+    }
+
+    // 仿真模式：打开配置弹窗
     setEditingNode(node);
 
     // 如果节点有参数定义，动态生成表单字段

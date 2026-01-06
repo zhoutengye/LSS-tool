@@ -2,12 +2,14 @@
 
 包含：
 - BlackBeltCommander: 核心编排器
+- IntelligentCommander: 智能工艺指挥官（指令生成）
 - DecisionEngine: 决策引擎
 - AnalysisWorkflow: 分析工作流
 - ReportFormatter: 报告格式化器
 """
 
 from .orchestrator import BlackBeltCommander, DiagnosisReport
+from .commander import IntelligentCommander, Instruction
 from .decision_engine import (
     DecisionEngine,
     RuleBasedDecisionEngine,
@@ -26,7 +28,9 @@ from .report_formatter import ReportFormatter
 
 __all__ = [
     "BlackBeltCommander",
+    "IntelligentCommander",
     "DiagnosisReport",
+    "Instruction",
     "DecisionEngine",
     "RuleBasedDecisionEngine",
     "LLMDecisionEngine",

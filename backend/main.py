@@ -557,3 +557,224 @@ def analyze_daily_production(request: DailyAnalysisRequest, db: Session = Depend
 
     except Exception as e:
         return {"error": str(e), "success": False}
+
+# ============================================
+# 指令管理 API 端点
+# ============================================
+
+@app.get("/api/instructions")
+def get_instructions(
+    role: str,
+    status: Optional[str] = None,
+    target_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    获取指令列表
+    
+    GET /api/instructions?role=Operator&status=Pending,Read
+    """
+    try:
+        from analysis import IntelligentCommander
+        from datetime import datetime
+        
+        commander = IntelligentCommander(db)
+        
+        # 默认查询今天
+        if not target_date:
+            target_date = datetime.now().strftime("%Y-%m-%d")
+        
+        instructions = commander.get_instructions_by_role(
+            role=role,
+            target_date=target_date,
+            status=status
+        )
+        
+        return {
+            "instructions": [
+                {
+                    "id": inst.id,
+                    "role": inst.role,
+                    "content": inst.content,
+                    "priority": inst.priority,
+                    "status": inst.status,
+                    "evidence": inst.evidence,
+                    "node_code": inst.node_code,
+                    "batch_id": inst.batch_id,
+                    "created_at": inst.instruction_date.isoformat() if inst.instruction_date else None
+                }
+                for inst in instructions
+            ],
+            "success": True
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/instructions/{instruction_id}/read")
+def mark_instruction_read(instruction_id: int, db: Session = Depends(get_db)):
+    """
+    标记指令为已读（进行中）
+    
+    POST /api/instructions/123/read
+    """
+    try:
+        from analysis import IntelligentCommander
+        
+        commander = IntelligentCommander(db)
+        commander.mark_instruction_read(instruction_id)
+        
+        return {"success": True, "message": "指令已标记为进行中"}
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/instructions/{instruction_id}/done")
+def mark_instruction_done(
+    instruction_id: int,
+    feedback: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    标记指令为完成
+    
+    POST /api/instructions/123/done
+    Body: { "feedback": "已完成调整" }
+    """
+    try:
+        from analysis import IntelligentCommander
+        
+        commander = IntelligentCommander(db)
+        commander.mark_instruction_done(instruction_id, feedback or "")
+        
+        return {"success": True, "message": "指令已完成"}
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+# ============================================
+# 监控数据 API 端点
+# ============================================
+
+@app.get("/api/monitor/node/{node_code}")
+def get_node_monitoring(node_code: str, db: Session = Depends(get_db)):
+    """
+    获取节点监控数据（实时SCADA或历史数据）
+    
+    GET /api/monitor/node/E04
+    """
+    try:
+        import models
+        from sqlalchemy import desc
+        
+        # 查询该节点最近的温度测量数据
+        measurements = db.query(models.Measurement).filter(
+            models.Measurement.node_code == node_code,
+            models.Measurement.param_code == "temp"  # 假设查温度
+        ).order_by(desc(models.Measurement.timestamp)).limit(100).all()
+        
+        if not measurements:
+            return {
+                "trend": {"times": [], "values": [], "cpk_history": []},
+                "statistics": None,
+                "success": True
+            }
+        
+        # 提取数据
+        times = [m.timestamp.strftime("%H:%M") for m in measurements]
+        values = [float(m.value) for m in measurements]
+        
+        # 简单计算统计数据（实际应调用SPC工具）
+        import statistics
+        current_value = values[0] if values else 0
+        avg_value = statistics.mean(values) if len(values) > 1 else 0
+        std_value = statistics.stdev(values) if len(values) > 1 else 0
+        
+        # 模拟Cpk历史（实际应从分析结果获取）
+        cpk_history = [1.45, 1.33, 1.21, 1.15, 1.08]
+        cpk = cpk_history[-1] if cpk_history else 1.0
+        
+        # 假设规格（实际应从ParameterDef获取）
+        usl, lsl, target = 85.0, 79.0, 82.0
+        
+        # 计算偏离度（σ）
+        deviation = (current_value - target) / std_value if std_value > 0 else 0
+        
+        return {
+            "trend": {
+                "times": times,
+                "values": values,
+                "cpk_history": cpk_history
+            },
+            "statistics": {
+                "cpk": cpk,
+                "current_value": current_value,
+                "usl": usl,
+                "lsl": lsl,
+                "target": target,
+                "deviation": deviation
+            },
+            "success": True
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.get("/api/monitor/latest")
+def get_all_latest_status(db: Session = Depends(get_db)):
+    """
+    获取所有节点的最新状态（用于节点颜色更新）
+    
+    GET /api/monitor/latest
+    """
+    try:
+        import models
+        from sqlalchemy import desc, func
+        
+        # 获取所有Unit节点
+        nodes = db.query(models.ProcessNode).filter(
+            models.ProcessNode.node_type == "Unit"
+        ).all()
+        
+        node_status = []
+        for node in nodes:
+            # 获取该节点最新测量值
+            latest = db.query(models.Measurement).filter(
+                models.Measurement.node_code == node.code,
+                models.Measurement.param_code == "temp"
+            ).order_by(desc(models.Measurement.timestamp)).first()
+            
+            if latest:
+                # 简化版：根据温度判断Cpk（实际应调用SPC计算）
+                temp = float(latest.value)
+                if temp > 84.0:
+                    status = "CRITICAL"
+                    cpk = 0.6
+                elif temp > 82.0:
+                    status = "WARNING"
+                    cpk = 1.0
+                else:
+                    status = "NORMAL"
+                    cpk = 1.5
+                
+                node_status.append({
+                    "node_code": node.code,
+                    "current_value": temp,
+                    "cpk": cpk,
+                    "status": status
+                })
+        
+        return {
+            "nodes": node_status,
+            "success": True
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+# ============================================
+# Demo API 端点 (基于真实架构的轻量化实现)
+# ============================================
+
+from demo_api import router as demo_router
+app.include_router(demo_router)
