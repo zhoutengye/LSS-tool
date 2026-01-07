@@ -1,11 +1,22 @@
+# Web框架
 fastapi
-uvicorn
+uvicorn[standard]
+
+# 数据库
 sqlalchemy
+
+# 数据分析
 pandas
 numpy
 scipy
+
+# 数据验证
 pydantic
+
+# 图论与优化
 networkx    # 图论分析
-pgmpy       # 贝叶斯网络 (PDF 6.2节核心)
-pymoo       # 多目标优化 (PDF 6.1节核心)
-# torch     # (GCN以后再装，先不加太大)
+pgmpy       # 贝叶斯网络
+pymoo       # 多目标优化
+
+# 可选：深度学习 (GCN等，暂不安装)
+# torch

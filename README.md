@@ -29,15 +29,19 @@ LSS v2.0 通过 IDEF0 层级建模方法，将药品制造过程分解为：
 - SQLAlchemy (ORM)
 - SQLite (数据库)
 - pandas, numpy, scipy (数据分析)
+- pydantic (数据验证)
 - networkx (图论分析)
 - pgmpy (贝叶斯网络)
 - pymoo (多目标优化)
 
 **前端**:
-- React 19 + Vite
-- React Flow (图谱可视化)
-- Ant Design 6 (UI组件)
-- ECharts (数据可视化)
+- React 19.2.0 + Vite 7.2.4
+- React Flow 11.11.4 (图谱可视化)
+- Ant Design 6.1.3 (UI组件)
+- @ant-design/icons 6.1.0 (图标库)
+- ECharts 6.0.0 (数据可视化)
+- echarts-for-react 3.0.5 (ECharts React封装)
+- axios 1.13.2 (HTTP客户端)
 
 ---
 
@@ -56,22 +60,48 @@ LSS v2.0 通过 IDEF0 层级建模方法，将药品制造过程分解为：
 ```bash
 cd backend
 conda activate med
-pip install fastapi uvicorn sqlalchemy  # 首次运行
+pip install -r requirements.txt  # 首次运行，安装所有依赖
 python main.py
 ```
 
 服务地址：`http://127.0.0.1:8000`
 API文档：`http://127.0.0.1:8000/docs`
 
+**依赖说明**:
+- fastapi - Web框架
+- uvicorn - ASGI服务器
+- sqlalchemy - ORM
+- pandas - 数据分析
+- numpy - 数值计算
+- scipy - 科学计算
+- pydantic - 数据验证
+- networkx - 图论分析
+- pgmpy - 贝叶斯网络
+- pymoo - 多目标优化
+
 ### 3. 前端启动
 
 ```bash
 cd frontend
-npm install  # 首次运行
+# 确保使用 Node.js 20.19+ (Vite 7.2.4 要求)
+source ~/.nvm/nvm.sh  # 如果使用 nvm
+nvm use 20
+npm install          # 首次运行，安装所有依赖
 npm run dev
 ```
 
 访问地址：`http://localhost:5173`
+
+**依赖说明**:
+- react 19.2.0 - UI框架
+- react-dom 19.2.0 - React DOM
+- vite 7.2.4 - 构建工具
+- antd 6.1.3 - UI组件库
+- @ant-design/icons 6.1.0 - 图标库
+- reactflow 11.11.4 - 流程图组件
+- echarts 6.0.0 - 图表库
+- echarts-for-react 3.0.5 - ECharts React封装
+- axios 1.13.2 - HTTP客户端
 
 ---
 
@@ -209,10 +239,28 @@ LSS/
 ### 4. LSS 工具箱
 
 按 DMAIC 改进循环分为四层：
-- **第一层**: 描述性统计 (SPC控制图、Pareto、直方图)
-- **第二层**: 诊断性分析 (相关性、方差分析、故障树)
-- **第三层**: 预测性分析 (贝叶斯网络、时序预测、回归)
-- **第四层**: 指导性优化 (NSGA-II、DOE实验设计)
+
+**第一层：描述性统计** (✅ 已实现4个工具)
+- SPC控制图 - 过程能力分析、Cpk计算、Nelson Rules违规检测
+- 帕累托图 - 识别"关键少数"问题，80/20法则分析
+- 直方图 - 频数分布、正态性检验、偏度和峰度
+- 箱线图 - 多车间对比、异常值识别
+
+**第二层：诊断性分析** (规划中)
+- 故障树分析 (FTA)
+- 鱼骨图
+- 相关性分析
+- 方差分析 (ANOVA)
+
+**第三层：预测性分析** (规划中)
+- 贝叶斯网络
+- 时序预测 (ARIMA)
+- 多元回归
+
+**第四层：指导性优化** (规划中)
+- NSGA-II 多目标优化
+- DOE 实验设计
+- 响应曲面法 (RSM)
 
 ---
 

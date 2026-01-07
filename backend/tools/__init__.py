@@ -8,7 +8,13 @@
 """
 
 from .descriptive.spc import SPCTool
+from .descriptive.pareto import ParetoTool
+from .descriptive.histogram import HistogramTool
+from .descriptive.boxplot import BoxplotTool
 
 __all__ = [
     "SPCTool",
+    "ParetoTool",
+    "HistogramTool",
+    "BoxplotTool",
 ]

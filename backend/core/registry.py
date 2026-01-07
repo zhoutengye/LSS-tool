@@ -6,6 +6,9 @@
 from typing import Dict, Optional
 from .base import BaseTool
 from tools.descriptive.spc import SPCTool
+from tools.descriptive.pareto import ParetoTool
+from tools.descriptive.histogram import HistogramTool
+from tools.descriptive.boxplot import BoxplotTool
 
 
 class ToolRegistry:
@@ -97,6 +100,9 @@ def register_all_tools():
 
     # 第一层：描述性统计 (Descriptive)
     registry.register("spc", SPCTool())
+    registry.register("pareto", ParetoTool())
+    registry.register("histogram", HistogramTool())
+    registry.register("boxplot", BoxplotTool())
 
     # TODO: 未来添加更多工具
     # registry.register("pareto", ParetoTool())

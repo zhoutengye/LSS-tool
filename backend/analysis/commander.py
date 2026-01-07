@@ -436,7 +436,9 @@ class IntelligentCommander:
         )
 
         if status:
-            query = query.filter(models.DailyInstruction.status == status)
+            # 支持逗号分隔的多个状态: "Pending,Read" -> ["Pending", "Read"]
+            status_list = [s.strip() for s in status.split(',')]
+            query = query.filter(models.DailyInstruction.status.in_(status_list))
 
         return query.order_by(
             models.DailyInstruction.priority.desc(),

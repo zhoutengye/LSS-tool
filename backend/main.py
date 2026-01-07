@@ -36,9 +36,10 @@ app = FastAPI(title="Wexin LSS Engine")
 # 跨域配置 (让前端能连上)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # 允许所有源
+    allow_credentials=True,  # 允许携带凭证
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
 )
 
 
@@ -770,6 +771,14 @@ def get_all_latest_status(db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e), "success": False}
+
+
+# ============================================
+# LSS 工具箱 API 端点
+# ============================================
+
+from routers import lss_router
+app.include_router(lss_router)
 
 
 # ============================================

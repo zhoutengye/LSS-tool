@@ -82,9 +82,9 @@ export default function MonitorPanel({ selectedNode, isLiveMode = false }) {
       },
       markLine: {
         data: [
-          { yAxis: statistics?.usl, name: '上限', lineStyle: { color: '#ff4d4f' } },
-          { yAxis: statistics?.target, name: '目标', lineStyle: { color: '#52c41a' } },
-          { yAxis: statistics?.lsl, name: '下限', lineStyle: { color: '#ff4d4f' } }
+          ...(statistics?.usl != null ? [{ yAxis: statistics.usl, name: '上限', lineStyle: { color: '#ff4d4f' } }] : []),
+          ...(statistics?.target != null ? [{ yAxis: statistics.target, name: '目标', lineStyle: { color: '#52c41a' } }] : []),
+          ...(statistics?.lsl != null ? [{ yAxis: statistics.lsl, name: '下限', lineStyle: { color: '#ff4d4f' } }] : [])
         ]
       }
     }],

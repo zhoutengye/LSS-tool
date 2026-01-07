@@ -14,6 +14,7 @@ from core.notification_center import NotificationCenter
 from core.rag_engine import RAGEngine
 from ingestion import DataIngestor
 from database import SessionLocal
+import models
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 

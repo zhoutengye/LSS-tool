@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Layout, Button, Tag, message, Switch, Space, Typography, Divider } from 'antd';
-import { ThunderboltOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Layout, Button, Tag, message, Switch, Space, Typography, Divider, Menu } from 'antd';
+import { ThunderboltOutlined, HistoryOutlined, ReloadOutlined, BarChartOutlined, HomeOutlined, ExperimentOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import ProcessFlow from './components/ProcessFlow';
 import ActionList from './components/ActionList';
 import MonitorPanel from './components/MonitorPanel';
+import LSSToolsPage from './pages/LSSToolsPage';
+import IntelligentAnalysisPage from './pages/IntelligentAnalysisPage';
 
 const { Header, Content, Sider, Footer } = Layout;
 const { Text } = Typography;
 
 function App() {
+  // 页面切换
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'lss-tools', or 'intelligent-analysis'
+
   // 系统状态
   const [status, setStatus] = useState("未连接");
 
@@ -110,6 +115,33 @@ function App() {
           <span>稳心颗粒 - 智能工艺指挥台</span>
         </div>
 
+        <div style={{ marginLeft: '40px', display: 'flex', gap: '8px' }}>
+          <Button
+            type={currentPage === 'home' ? 'primary' : 'text'}
+            icon={<HomeOutlined />}
+            onClick={() => setCurrentPage('home')}
+            style={{ color: currentPage === 'home' ? 'white' : 'rgba(255,255,255,0.65)' }}
+          >
+            工艺监控
+          </Button>
+          <Button
+            type={currentPage === 'lss-tools' ? 'primary' : 'text'}
+            icon={<BarChartOutlined />}
+            onClick={() => setCurrentPage('lss-tools')}
+            style={{ color: currentPage === 'lss-tools' ? 'white' : 'rgba(255,255,255,0.65)' }}
+          >
+            LSS工具箱
+          </Button>
+          <Button
+            type={currentPage === 'intelligent-analysis' ? 'primary' : 'text'}
+            icon={<ExperimentOutlined />}
+            onClick={() => setCurrentPage('intelligent-analysis')}
+            style={{ color: currentPage === 'intelligent-analysis' ? 'white' : 'rgba(255,255,255,0.65)' }}
+          >
+            AI黑带专家
+          </Button>
+        </div>
+
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
           {/* 模式切换 */}
           <Space>
@@ -138,7 +170,12 @@ function App() {
       </Header>
 
       {/* 主体内容 */}
-      <Layout>
+      {currentPage === 'intelligent-analysis' ? (
+        <IntelligentAnalysisPage />
+      ) : currentPage === 'lss-tools' ? (
+        <LSSToolsPage />
+      ) : (
+        <Layout>
         {/* 左侧：工艺流程图 */}
         <Content style={{
           padding: '16px',
@@ -204,7 +241,7 @@ function App() {
           </div>
         </Sider>
       </Layout>
-
+      )}
       {/* 底部 */}
       <Footer style={{
         textAlign: 'center',
