@@ -267,14 +267,25 @@ python demo_commander.py
 ```
 LSS/
 ├── backend/                # 后端代码
+│   ├── routers/           # API 路由模块 (按功能拆分) ⭐
+│   │   ├── lss_tools.py   # LSS 工具箱 API (~16KB)
+│   │   ├── graph.py       # 工艺图谱 API (~8.7KB)
+│   │   ├── analysis.py    # 智能分析 API (~6.4KB)
+│   │   ├── instructions.py # 指令管理 API (~5.9KB)
+│   │   ├── monitoring.py  # 监控数据 API (~3.9KB)
+│   │   └── demo.py        # 演示管理 API (~10KB)
 │   ├── core/              # 核心抽象层
 │   ├── analysis/          # 智能编排层 ⭐
 │   │   └── commander.py   # IntelligentCommander (指令生成)
 │   ├── tools/             # 分析工具 (SPC/诊断/预测/优化)
+│   │   ├── descriptive/   # 第一层：描述性统计
+│   │   ├── diagnostic/    # 第二层：诊断性分析
+│   │   ├── predictive/    # 第三层：预测性分析
+│   │   └── prescriptive/  # 第四层：指导性优化
 │   ├── data/              # 数据访问层
 │   ├── agent/             # LLM集成 (未来)
 │   ├── models.py          # 数据库模型
-│   ├── main.py            # FastAPI应用 (包含Demo API)
+│   ├── main.py            # FastAPI应用入口 (127行，网关) ⭐
 │   └── initial_data/      # 知识图谱源文件 (CSV)
 │
 ├── frontend/              # 前端代码
@@ -296,6 +307,15 @@ LSS/
 ├── DEVELOPMENT_LOG.md     # 框架梳理与开发日志 ⭐
 └── QUICK_START.md         # 快速启动指南
 ```
+
+**架构说明**:
+
+后端采用 **Router Modularization（路由模块化）** 设计，将原来 1213 行的单体 main.py 拆分为 6 个功能模块（减少了 89.5%），每个模块负责特定功能域：
+
+- **高内聚低耦合**：每个路由模块专注于特定功能域
+- **易于维护**：修改某个功能只需编辑对应的路由文件
+- **可扩展性**：新增功能只需创建新路由模块并注册
+- **代码复用**：共享的依赖注入和工具函数统一管理
 
 ---
 

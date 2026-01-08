@@ -23,6 +23,7 @@ Example:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
+from pathlib import Path
 import models
 
 # 启动时自动建表
@@ -38,11 +39,10 @@ app = FastAPI(title="Wexin LSS Engine")
 @app.on_event("startup")
 async def startup_event():
     """应用启动时自动初始化演示数据"""
-    import os
     from initial_data.demo_init import init_demo_data
 
     # 获取数据库路径（与 database.py 中的配置保持一致）
-    db_path = os.path.join(os.path.dirname(__file__), "lss.db")
+    db_path = str(Path(__file__).parent / "lss.db")
 
     print("\n" + "="*60)
     print("🚀 LSS 系统启动中...")

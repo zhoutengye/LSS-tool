@@ -251,6 +251,45 @@
 - 分析工具调度
 - RESTful API 提供
 
+**后端架构设计**：
+
+后端采用 **FastAPI + Router Modularization** 架构：
+
+- **main.py (127 行)**：应用入口，负责启动配置、CORS、路由注册
+- **routers/**：按功能域拆分的 6 个路由模块
+  - graph.py - 工艺图谱 API（节点、边、风险树）
+  - analysis.py - 智能分析 API（6 种分析维度）
+  - instructions.py - 指令管理 API（状态流转）
+  - monitoring.py - 监控数据 API（实时数据）
+  - demo.py - 演示管理 API（环境管理）
+  - lss_tools.py - LSS 工具箱 API（统计工具）
+
+**路由注册模式**：
+
+.. code-block:: python
+
+   # main.py 中的路由注册
+   from routers import lss_router
+   app.include_router(lss_router)
+
+   from routers import graph, analysis, instructions, monitoring, demo
+   app.include_router(graph.router)
+   app.include_router(analysis.router)
+   app.include_router(instructions.router)
+   app.include_router(monitoring.router)
+   app.include_router(demo.router)
+
+**API 端点组织**：
+
+所有 API 端点按功能模块前缀组织：
+
+- ``/api/graph/*`` - 工艺图谱相关
+- ``/api/analysis/*`` - 智能分析相关
+- ``/api/instructions/*`` - 指令管理相关
+- ``/api/monitor/*`` - 监控数据相关
+- ``/api/demo/*`` - 演示管理相关
+- ``/api/tools/*`` - LSS 工具箱相关
+
 1.2 项目目录结构
 ^^^^^^^^^^^^^^^^
 
@@ -258,11 +297,19 @@
 
    LSS/
    ├── backend/                # 后端代码
-   │   ├── main.py            # FastAPI 主程序 (网关)
+   │   ├── main.py            # FastAPI 主程序 (127行，网关)
    │   ├── models.py          # 数据库模型
    │   ├── database.py        # 数据库配置 (基建)
    │   ├── ingestion.py       # 数据采集接口 (ETL漏斗)
    │   ├── seed.py            # 数据导入脚本 (构建者)
+   │   │
+   │   ├── routers/           # API 路由模块 (按功能拆分)
+   │   │   ├── lss_tools.py   # LSS 工具箱路由 (~16KB)
+   │   │   ├── graph.py       # 工艺图谱路由 (~8.7KB)
+   │   │   ├── analysis.py    # 智能分析路由 (~6.4KB)
+   │   │   ├── instructions.py # 指令管理路由 (~5.9KB)
+   │   │   ├── monitoring.py  # 监控数据路由 (~3.9KB)
+   │   │   └── demo.py        # 演示管理路由 (~10KB)
    │   │
    │   ├── core/              # LSS 工具箱 (算法大脑)
    │   │   ├── base.py        # BaseTool 基类
@@ -270,6 +317,12 @@
    │   │   ├── spc_tools.py   # SPC 分析工具
    │   │   ├── optimization.py # 优化工具 (规划中)
    │   │   └── risk_engine.py  # 风险分析 (规划中)
+   │   │
+   │   ├── tools/             # 四层工具体系
+   │   │   ├── descriptive/   # 第一层：描述性统计
+   │   │   ├── diagnostic/    # 第二层：诊断性分析
+   │   │   ├── predictive/    # 第三层：预测性分析
+   │   │   └── prescriptive/  # 第四层：指导性优化
    │   │
    │   └── initial_data/      # 知识图谱源文件 (CSV)
    │       ├── master_flow.csv    # 总流程 (4个Block)
@@ -288,6 +341,24 @@
    └── docs/                  # 文档
        ├── source/            # Sphinx 源文件
        └── build/             # 生成的 HTML
+
+**模块化架构说明**:
+
+后端采用 **Router Modularization（路由模块化）** 设计，将原来 1213 行的单体 main.py 拆分为 6 个功能模块：
+
+1. **lss_tools.py** - LSS 工具箱 API（SPC、Pareto、Histogram、Boxplot）
+2. **graph.py** - 工艺图谱和风险树 API
+3. **analysis.py** - 智能分析 API（人/批次/工序/车间/时间/日报）
+4. **instructions.py** - 指令管理 API（查询/标记/生成）
+5. **monitoring.py** - 监控数据 API（节点监控/最新状态）
+6. **demo.py** - 演示环境管理 API（重置/初始化/登录/填报）
+
+这种架构的优势：
+
+- **高内聚低耦合**：每个路由模块专注于特定功能域
+- **易于维护**：修改某个功能只需编辑对应的路由文件
+- **可扩展性**：新增功能只需创建新路由模块并注册
+- **代码复用**：共享的依赖注入和工具函数统一管理
 
 
 2. 数据模型设计

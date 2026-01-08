@@ -1,6 +1,68 @@
 后端模块
 ========
 
+后端采用 **Router Modularization（路由模块化）** 架构设计。
+
+架构概述
+--------
+
+**模块化组织**:
+
+后端代码按功能域拆分为 6 个独立的路由模块：
+
+- **routers/lss_tools.py** (~16KB) - LSS 工具箱 API
+- **routers/graph.py** (~8.7KB) - 工艺图谱 API
+- **routers/analysis.py** (~6.4KB) - 智能分析 API
+- **routers/instructions.py** (~5.9KB) - 指令管理 API
+- **routers/monitoring.py** (~3.9KB) - 监控数据 API
+- **routers/demo.py** (~10KB) - 演示管理 API
+
+**重构成果**:
+
+- main.py 从 1213 行减少到 127 行（减少 89.5%）
+- 每个路由模块专注于特定功能域
+- 易于维护和扩展
+
+**路由注册**:
+
+.. code-block:: python
+
+   # main.py 中的路由注册
+   from routers import lss_router
+   app.include_router(lss_router)
+
+   from routers import graph, analysis, instructions, monitoring, demo
+   app.include_router(graph.router)
+   app.include_router(analysis.router)
+   app.include_router(instructions.router)
+   app.include_router(monitoring.router)
+   app.include_router(demo.router)
+
+**新增路由模块指南**:
+
+1. 在 ``backend/routers/`` 目录创建新文件（如 ``myfeature.py``）
+2. 导入 FastAPI 的 APIRouter 并定义路由
+3. 在 main.py 中导入并注册路由
+
+示例：
+
+.. code-block:: python
+
+   # routers/myfeature.py
+   from fastapi import APIRouter, Depends
+   from sqlalchemy.orm import Session
+   from database import get_db
+
+   router = APIRouter(prefix="/api/myfeature", tags=["MyFeature"])
+
+   @router.get("/")
+   def get_items(db: Session = Depends(get_db)):
+       return {"items": []}
+
+   # main.py
+   from routers import myfeature
+   app.include_router(myfeature.router)
+
 FastAPI 主程序
 ---------------
 
