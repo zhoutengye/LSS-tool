@@ -267,8 +267,6 @@ def init_demo_data(db_path: str = "lss.db"):
         print("🏗️ 初始化工艺流程图...")
 
         # 导入seed函数
-        import sys
-        import os
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         seed_path = os.path.join(backend_dir, 'seed.py')
 
