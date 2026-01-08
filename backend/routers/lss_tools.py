@@ -226,13 +226,14 @@ def analyze_pareto(request: ParetoRequest):
 
 
 @router.get("/pareto/demo")
-def get_pareto_demo_data():
+def get_pareto_demo_data(db: Session = Depends(get_db)):
     """获取帕累托图演示数据
 
     Returns:
-        预设的故障类别数据，用于Demo演示
+        预设的故障类别数据 + 动态统计的异常数据
     """
-    demo_data = [
+    # 基础演示数据（169条）
+    base_demo_data = [
         {"category": "温度异常", "count": 45},
         {"category": "压力异常", "count": 28},
         {"category": "液位异常", "count": 22},
@@ -245,9 +246,79 @@ def get_pareto_demo_data():
         {"category": "其他原因", "count": 5},
     ]
 
+    # 统计数据库中SOURCE_TYPE='SENSOR'的异常数据（通过下工填报新增的）
+    sensor_measurements = db.query(models.Measurement).filter(
+        models.Measurement.source_type == "SENSOR"
+    ).all()
+
+    # 按类别统计新增异常
+    additional_counts = {}
+    for meas in sensor_measurements:
+        param_code = meas.param_code
+        value = float(meas.value)
+
+        # 处理P前缀的参数代码
+        if param_code.startswith("P_"):
+            parts = param_code.split("_")
+            if len(parts) >= 3:
+                param_type = parts[-1]
+            else:
+                param_type = param_code
+        else:
+            param_type = param_code
+
+        # 映射到类别
+        if param_type == "TEMP":
+            category = "温度异常"
+        elif param_type == "PRESSURE":
+            category = "压力异常"
+        elif param_type == "LEVEL":
+            category = "液位异常"
+        elif param_type == "MOISTURE":
+            category = "其他原因"  # 水分归到其他
+        elif param_code == "motor_status" and value == 0.0:
+            category = "设备故障"
+        else:
+            continue
+
+        # 检查是否异常（超出规格限）
+        param_def = db.query(models.ParameterDef).filter(
+            models.ParameterDef.code == param_code
+        ).first()
+
+        is_abnormal = False
+        if param_def:
+            if value > param_def.usl or value < param_def.lsl:
+                is_abnormal = True
+        else:
+            # 默认规格判断
+            if param_type == "TEMP" and (value > 90 or value < 75):
+                is_abnormal = True
+            elif param_type == "PRESSURE" and (value > 2.5 or value < 0.8):
+                is_abnormal = True
+            elif param_type == "LEVEL" and (value > 90 or value < 20):
+                is_abnormal = True
+
+        if is_abnormal:
+            additional_counts[category] = additional_counts.get(category, 0) + 1
+
+    # 将新增异常加到基础数据上
+    result_data = []
+    for item in base_demo_data:
+        category = item["category"]
+        base_count = item["count"]
+        additional = additional_counts.get(category, 0)
+        result_data.append({
+            "category": category,
+            "count": base_count + additional
+        })
+
+    # 按计数降序排序
+    result_data.sort(key=lambda x: x["count"], reverse=True)
+
     return {
         "success": True,
-        "data": demo_data
+        "data": result_data
     }
 
 

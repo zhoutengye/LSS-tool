@@ -33,11 +33,36 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Wexin LSS Engine")
 
+
+# ============================================
+# 启动事件：初始化演示数据
+# ============================================
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时自动初始化演示数据"""
+    import os
+    from initial_data.demo_init import init_demo_data
+
+    # 获取数据库路径（与 database.py 中的配置保持一致）
+    db_path = os.path.join(os.path.dirname(__file__), "lss.db")
+
+    print("\n" + "="*60)
+    print("🚀 LSS 系统启动中...")
+    print("="*60)
+
+    # 初始化演示数据
+    init_demo_data(db_path)
+
+    print("="*60)
+    print("✅ LSS 系统启动完成！")
+    print("="*60 + "\n")
+
 # 跨域配置 (让前端能连上)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 允许所有源
-    allow_credentials=True,  # 允许携带凭证
+    allow_credentials=False,  # 当使用 "*" 时必须设为 False
     allow_methods=["*"],  # 允许所有HTTP方法
     allow_headers=["*"],  # 允许所有请求头
 )
@@ -725,18 +750,18 @@ def get_node_monitoring(node_code: str, db: Session = Depends(get_db)):
 def get_all_latest_status(db: Session = Depends(get_db)):
     """
     获取所有节点的最新状态（用于节点颜色更新）
-    
+
     GET /api/monitor/latest
     """
     try:
         import models
         from sqlalchemy import desc, func
-        
+
         # 获取所有Unit节点
         nodes = db.query(models.ProcessNode).filter(
             models.ProcessNode.node_type == "Unit"
         ).all()
-        
+
         node_status = []
         for node in nodes:
             # 获取该节点最新测量值
@@ -744,7 +769,7 @@ def get_all_latest_status(db: Session = Depends(get_db)):
                 models.Measurement.node_code == node.code,
                 models.Measurement.param_code == "temp"
             ).order_by(desc(models.Measurement.timestamp)).first()
-            
+
             if latest:
                 # 简化版：根据温度判断Cpk（实际应调用SPC计算）
                 temp = float(latest.value)
@@ -757,17 +782,109 @@ def get_all_latest_status(db: Session = Depends(get_db)):
                 else:
                     status = "NORMAL"
                     cpk = 1.5
-                
+
                 node_status.append({
                     "node_code": node.code,
                     "current_value": temp,
                     "cpk": cpk,
                     "status": status
                 })
-        
+
         return {
             "nodes": node_status,
             "success": True
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/instructions/generate-today")
+def generate_today_instructions(db: Session = Depends(get_db)):
+    """
+    生成今日工艺指令（演示用）
+
+    POST /api/instructions/generate-today
+    """
+    try:
+        from datetime import datetime
+
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 检查是否已有今日指令
+        existing = db.query(models.DailyInstruction).filter(
+            models.DailyInstruction.target_date == today
+        ).all()
+
+        if existing:
+            # 删除旧指令
+            for inst in existing:
+                db.delete(inst)
+            db.commit()
+
+        # 生成示例指令
+        instructions_data = [
+            {
+                "target_date": today,
+                "role": "Operator",
+                "content": "检测到E04 醇提罐温度异常（当前85.5℃），建议将蒸汽阀开度从50%调至45%",
+                "priority": "HIGH",
+                "evidence": {"current_value": 85.5, "target_value": 82.0, "cpk": 0.85},
+                "action_code": "ADJUST_TEMP",
+                "batch_id": "BATCH-001",
+                "node_code": "E04",
+                "param_code": "temp",
+                "status": "Pending"
+            },
+            {
+                "target_date": today,
+                "role": "QA",
+                "content": "E04 醇提罐温度Cpk=0.85低于临界值1.33，请对批次BATCH-001启动偏差调查流程",
+                "priority": "HIGH",
+                "evidence": {"cpk": 0.85, "threshold": 1.33},
+                "action_code": "DEV_INVESTIGATION",
+                "batch_id": "BATCH-001",
+                "node_code": "E04",
+                "param_code": "temp",
+                "status": "Pending"
+            },
+            {
+                "target_date": today,
+                "role": "Operator",
+                "content": "C01 混合机液位偏低（当前35%），请检查进料阀是否正常",
+                "priority": "MEDIUM",
+                "evidence": {"current_value": 35, "threshold": 40},
+                "action_code": "CHECK_LEVEL",
+                "batch_id": "BATCH-002",
+                "node_code": "C01",
+                "param_code": "level",
+                "status": "Pending"
+            },
+            {
+                "target_date": today,
+                "role": "TeamLeader",
+                "content": "E03 投料站即将到清洁周期（已运行23小时），请安排清洁计划",
+                "priority": "LOW",
+                "evidence": {"run_hours": 23, "max_hours": 24},
+                "action_code": "SCHEDULE_CLEAN",
+                "batch_id": None,
+                "node_code": "E03",
+                "param_code": None,
+                "status": "Pending"
+            }
+        ]
+
+        # 保存到数据库
+        for inst_data in instructions_data:
+            record = models.DailyInstruction(**inst_data)
+            db.add(record)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"已生成 {len(instructions_data)} 条今日工艺指令",
+            "count": len(instructions_data),
+            "date": today
         }
     except Exception as e:
         return {"error": str(e), "success": False}
@@ -779,6 +896,312 @@ def get_all_latest_status(db: Session = Depends(get_db)):
 
 from routers import lss_router
 app.include_router(lss_router)
+
+
+# ============================================
+# Demo 演示数据管理端点
+# ============================================
+
+@app.delete("/api/demo/reset")
+def reset_demo_data(db: Session = Depends(get_db)):
+    """
+    重置演示环境（回到初始状态）
+
+    DELETE /api/demo/reset
+
+    清空内容：
+    - 工人填报的测量记录（保留初始演示数据）
+    - 工人填报的批次记录（保留 BATCH-DEMO-001）
+    - 生成的指令（保留初始示例指令）
+
+    保留内容：
+    - ProcessNode (流程节点)
+    - ProcessEdge (流向)
+    - ParameterDef (参数定义)
+    - RiskNode/RiskEdge (风险图谱)
+    - ActionDef (对策库)
+    - 初始演示数据（700条历史测量 + 4条示例指令）
+    """
+    try:
+        from initial_data.demo_init import init_demo_data
+        import os
+
+        # 清空工人新增的动态数据（但保留初始演示数据）
+        # 删除非 BATCH-DEMO-001 的批次
+        db.query(models.Batch).filter(
+            models.Batch.id != "BATCH-DEMO-001"
+        ).delete()
+
+        # 删除 BATCH-DEMO-001 以外的测量记录（保留初始700条）
+        db.query(models.Measurement).filter(
+            models.Measurement.batch_id != "BATCH-DEMO-001"
+        ).delete()
+
+        # 删除今日以外的指令（保留初始示例指令）
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        db.query(models.DailyInstruction).filter(
+            models.DailyInstruction.target_date != today
+        ).delete()
+
+        # 清空今日的指令（会由 init_demo_data 重新生成）
+        db.query(models.DailyInstruction).filter(
+            models.DailyInstruction.target_date == today
+        ).delete()
+
+        db.commit()
+
+        # 重新初始化演示数据（恢复到初始状态）
+        db_path = os.path.join(os.path.dirname(__file__), "lss.db")
+        init_demo_data(db_path)
+
+        return {
+            "success": True,
+            "message": "✅ 演示环境已重置：已恢复到初始演示状态，工人填报数据已清空。"
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/demo/init-actions")
+def init_action_definitions(db: Session = Depends(get_db)):
+    """
+    初始化对策库数据（演示用）
+
+    POST /api/demo/init-actions
+
+    从 initial_data/actions.csv 加载对策定义到数据库。
+    """
+    try:
+        import csv
+        import os
+
+        # 检查是否已有数据
+        existing_count = db.query(models.ActionDef).count()
+        if existing_count > 0:
+            return {
+                "success": True,
+                "message": f"对策库已存在 {existing_count} 条记录，无需初始化。",
+                "count": existing_count
+            }
+
+        # 读取 actions.csv
+        actions_csv = os.path.join(
+            os.path.dirname(__file__),
+            "initial_data",
+            "actions.csv"
+        )
+
+        if not os.path.exists(actions_csv):
+            return {
+                "success": False,
+                "error": f"文件不存在: {actions_csv}"
+            }
+
+        with open(actions_csv, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            actions_data = list(reader)
+
+        # 插入数据
+        for row in actions_data:
+            active_str = row.get('active', 'true')
+            action = models.ActionDef(
+                code=row['code'],
+                name=row['name'],
+                risk_code=row['risk_code'],
+                target_role=row['target_role'],
+                instruction_template=row['instruction_template'],
+                priority=row['priority'],
+                category=row['category'],
+                estimated_impact=row.get('estimated_impact', ''),
+                active=active_str.lower() == 'true' if active_str else True
+            )
+            db.add(action)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"✅ 已初始化 {len(actions_data)} 条对策定义",
+            "count": len(actions_data)
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/demo/shift-report")
+def submit_shift_report(data: dict, db: Session = Depends(get_db)):
+    """
+    下工填报单（工人填写生产数据）
+
+    POST /api/demo/shift-report
+    {
+        "batch_id": "WX-20231026",
+        "worker_id": "WORKER_007",
+        "shift_end_time": "2023-10-26T17:00:00",
+        "data": [
+            {
+                "node_code": "E04",
+                "param_code": "temp",
+                "value": 98.5,
+                "unit": "℃"
+            },
+            {
+                "node_code": "E04",
+                "param_code": "pressure",
+                "value": 2.5,
+                "unit": "MPa"
+            },
+            {
+                "node_code": "E04",
+                "param_code": "motor_status",
+                "value": "abnormal",
+                "unit": "status"
+            }
+        ]
+    }
+    """
+    try:
+        from datetime import datetime
+
+        batch_id_input = data.get("batch_id")
+
+        # 创建或获取批次记录（注意：Batch模型的主键是id，不是batch_id）
+        batch = db.query(models.Batch).filter(
+            models.Batch.id == batch_id_input
+        ).first()
+
+        if not batch:
+            batch = models.Batch(
+                id=batch_id_input,  # 使用id字段
+                product_name="稳心颗粒",
+                start_time=datetime.now(),
+                status="In Progress"
+            )
+            db.add(batch)
+            db.commit()
+            db.refresh(batch)
+
+        # 插入测量数据
+        measurements = []
+        for item in data.get("data", []):
+            param_code = item.get("param_code")
+            node_code = item.get("node_code")
+            raw_value = item["value"]
+
+            # 转换参数代码为全大写P前缀格式: temp -> P_E04_TEMP
+            if param_code != "motor_status":  # motor_status保持原样
+                param_code = f"P_{node_code}_{param_code.upper()}"
+
+            # 根据参数类型处理值
+            # 注意：Measurement.value 字段是 Float 类型，不能存储字符串
+            if param_code == "motor_status":
+                # 将设备状态转换为数值代码：normal=1.0, abnormal=0.0
+                if isinstance(raw_value, str):
+                    processed_value = 1.0 if raw_value.lower() == "normal" else 0.0
+                else:
+                    processed_value = float(raw_value)
+            else:
+                # 数值型参数转换为float
+                processed_value = float(raw_value) if isinstance(raw_value, (int, float, str)) else 0
+
+            record = models.Measurement(
+                batch_id=batch.id,  # 外键关联
+                node_code=node_code,
+                param_code=param_code,
+                value=processed_value,
+                source_type="SENSOR",  # 标记为传感器数据
+                timestamp=datetime.now()
+            )
+            db.add(record)
+            measurements.append(record)
+
+        db.commit()
+
+        # 触发智能分析（模拟夜间批处理）
+        from analysis import IntelligentCommander
+        commander = IntelligentCommander(db)
+
+        # 生成指令
+        print(f"🔍 开始分析 {len(measurements)} 条测量数据...")
+        for meas in measurements:
+            print(f"  - {meas.node_code}.{meas.param_code} = {meas.value}")
+
+        instructions_generated = commander.generate_instructions_from_data(
+            batch_id=batch.id,  # 使用batch.id
+            measurements=measurements
+        )
+
+        print(f"✅ 分析完成，生成了 {len(instructions_generated)} 条指令")
+
+        return {
+            "success": True,
+            "message": f"已提交 {len(measurements)} 条数据，生成 {len(instructions_generated)} 条指令",
+            "batch_id": batch.id,
+            "data_count": len(measurements),
+            "instructions_count": len(instructions_generated)
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+
+
+@app.post("/api/demo/login")
+def worker_login(data: dict, db: Session = Depends(get_db)):
+    """
+    工人上工登录（刷卡）
+
+    POST /api/demo/login
+    {
+        "worker_id": "WORKER_007"
+    }
+    """
+    try:
+        from datetime import datetime
+
+        worker_id = data.get("worker_id")
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 查询今日指派给该工人的指令
+        instructions = db.query(models.DailyInstruction).filter(
+            models.DailyInstruction.target_date == today,
+            models.DailyInstruction.role.in_(["Operator", worker_id])
+        ).order_by(
+            models.DailyInstruction.priority.desc(),  # HIGH > MEDIUM > LOW
+            models.DailyInstruction.id
+        ).all()
+
+        # 查询系统状态概览
+        total_pending = db.query(models.DailyInstruction).filter(
+            models.DailyInstruction.target_date == today,
+            models.DailyInstruction.status == "Pending"
+        ).count()
+
+        return {
+            "success": True,
+            "worker_id": worker_id,
+            "worker_name": f"操作工 {worker_id}",
+            "login_time": datetime.now().isoformat(),
+            "briefing": {
+                "total_instructions": len(instructions),
+                "pending_count": total_pending,
+                "instructions": [
+                    {
+                        "id": inst.id,
+                        "priority": inst.priority,
+                        "content": inst.content,
+                        "node_code": inst.node_code,
+                        "batch_id": inst.batch_id,
+                        "evidence": inst.evidence
+                    }
+                    for inst in instructions
+                ]
+            }
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
 
 
 # ============================================

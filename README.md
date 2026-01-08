@@ -186,6 +186,82 @@ python demo_commander.py
 
 ---
 
+## 完整演示流程 🎬
+
+系统内置了完整的**生产周期演示**，展示从"下工填报"到"上工登录"的闭环流程。
+
+### 演示准备
+
+```bash
+# 1. 确保前后端都已启动
+# 后端：http://127.0.0.1:8000
+# 前端：http://localhost:5173
+
+# 2. 点击右上角的"重置演示"按钮，清空所有旧数据
+# 这会清空指令、测量记录、批次，但保留知识图谱
+```
+
+### 场景一：下工填报（17:00 下班前）
+
+**目标**：工人填写生产数据，系统自动分析并生成指令
+
+**步骤**：
+1. 点击顶部导航栏的 **"下工填报"** 按钮
+2. 填写生产日报表单：
+   - 批号：自动生成或手动输入
+   - 工号：WORKER_007
+   - **E04 醇提罐温度**：点击"填充异常数据"按钮（98.5℃）
+   - **E04 醇提罐压力**：2.5 MPa
+   - **电机状态**：异常
+3. 点击 **"提交日报并下班"**
+4. 系统自动分析数据，生成对应的指令
+
+**预期结果**：
+- 提交成功弹窗显示："已提交 3 条数据，生成 X 条指令"
+- 这些指令会存储在数据库中，等待次日工人登录时查看
+
+### 场景二：上工登录（次日 08:00 上班）
+
+**目标**：工人刷卡登录，系统强制展示今日操作重点
+
+**步骤**：
+1. 点击顶部导航栏的 **"上工登录"** 按钮
+2. 输入工号：`WORKER_007`（或直接点击快速登录按钮）
+3. 点击 **"上工打卡"**
+4. **系统弹出"今日操作重点"弹窗**（强制阅读）
+5. 查看系统生成的指令：
+   - ⚠️ 紧急：E04 温度异常，建议调整蒸汽阀
+   - ⚠️ 重要：E04 压力偏高，请检查设备
+   - ⚠️ 紧急：电机状态异常，请立即检修
+6. 点击 **"我已阅读并确认，进入系统"**
+
+**预期结果**：
+- 成功进入主页
+- 右下角"今日工艺指令"列表显示刚才生成的指令
+- 可以点击"执行"和"完成"按钮进行操作
+
+### 场景三：指令执行闭环
+
+**目标**：展示完整的指令执行流程
+
+**步骤**：
+1. 在右下角指令列表中，找到一条 **Pending** 状态的指令
+2. 点击 **"执行"** 按钮
+   - 指令状态变为 **Read**（进行中）
+   - 按钮变为 **"完成"**
+3. 点击 **"完成"** 按钮
+   - 系统记录反馈信息
+   - 指令状态变为 **Done**（已完成）
+
+### 演示亮点
+
+✅ **实时响应**：这边刚填完异常数据，那边立马生成指令
+✅ **强制合规**：必须确认阅读指令才能进入系统
+✅ **闭环管理**：从数据录入 → 指令生成 → 执行反馈，完整闭环
+✅ **可重复演示**：随时点击"重置演示"按钮，重新开始
+
+---
+
 ## 项目结构
 
 ```
@@ -193,20 +269,27 @@ LSS/
 ├── backend/                # 后端代码
 │   ├── core/              # 核心抽象层
 │   ├── analysis/          # 智能编排层 ⭐
+│   │   └── commander.py   # IntelligentCommander (指令生成)
 │   ├── tools/             # 分析工具 (SPC/诊断/预测/优化)
 │   ├── data/              # 数据访问层
 │   ├── agent/             # LLM集成 (未来)
 │   ├── models.py          # 数据库模型
-│   ├── main.py            # FastAPI应用
+│   ├── main.py            # FastAPI应用 (包含Demo API)
 │   └── initial_data/      # 知识图谱源文件 (CSV)
 │
 ├── frontend/              # 前端代码
 │   └── src/
 │       ├── components/
-│       │   ├── ProcessFlow.jsx   # 工艺流程图
-│       │   ├── MonitorPanel.jsx  # 实时监控面板 ⭐
-│       │   └── ActionList.jsx    # 待办指令列表 ⭐
-│       └── App.jsx        # 驾驶舱布局
+│       │   ├── ProcessFlow.jsx     # 工艺流程图
+│       │   ├── MonitorPanel.jsx    # 实时监控面板 ⭐
+│       │   ├── ActionList.jsx      # 待办指令列表 ⭐
+│       │   └── BriefingModal.jsx   # 今日操作重点弹窗 ⭐
+│       ├── pages/
+│       │   ├── LSSToolsPage.jsx         # LSS工具箱页面
+│       │   ├── IntelligentAnalysisPage.jsx  # AI黑带专家页面
+│       │   ├── ShiftReportPage.jsx    # 下工填报单页面 ⭐
+│       │   └── WorkerLoginPage.jsx    # 上工登录页面 ⭐
+│       └── App.jsx            # 驾驶舱布局（含Demo路由）
 │
 ├── verify_system.sh       # 系统验证脚本
 ├── README.md              # 本文件
@@ -266,24 +349,37 @@ LSS/
 
 ## API 端点
 
-### 指令相关 (新增)
+### Demo 演示相关 ⭐
 
+```bash
+# 重置演示环境（清空动态数据，保留知识图谱）
+DELETE /api/demo/reset
+
+# 下工填报（工人提交生产数据，系统自动分析生成指令）
+POST /api/demo/shift-report
+
+# 上工登录（工人刷卡，系统返回今日操作重点）
+POST /api/demo/login
 ```
+
+### 指令相关
+
+```bash
 GET  /api/instructions              # 获取指令列表
 POST /api/instructions/{id}/read    # 标记为进行中
 POST /api/instructions/{id}/done    # 标记为完成
 ```
 
-### 监控相关 (新增)
+### 监控相关
 
-```
+```bash
 GET /api/monitor/node/{node_code}  # 获取节点监控数据
 GET /api/monitor/latest             # 获取所有节点最新状态
 ```
 
-### 分析相关 (已有)
+### 分析相关
 
-```
+```bash
 POST /api/analysis/person           # 按人员分析
 POST /api/analysis/batch            # 按批次分析
 POST /api/analysis/process          # 按工序分析
@@ -291,9 +387,9 @@ POST /api/analysis/workshop         # 按车间分析
 POST /api/analysis/time             # 按时间分析
 ```
 
-### 图谱相关 (已有)
+### 图谱相关
 
-```
+```bash
 GET /api/graph/structure            # 获取流程图结构
 GET /api/graph/nodes/{code}/risks   # 获取节点风险
 ```
@@ -305,6 +401,7 @@ GET /api/graph/nodes/{code}/risks   # 获取节点风险
 ### 后端启动失败
 
 确保已安装所有依赖：
+
 ```bash
 pip install fastapi uvicorn sqlalchemy
 ```
@@ -315,10 +412,32 @@ pip install fastapi uvicorn sqlalchemy
 
 ### 指令列表是空的
 
-运行测试脚本生成数据：
+两种方法生成指令：
+
+**方法1：使用演示功能**（推荐）
+
+1. 点击顶部"下工填报"按钮
+2. 填写异常数据并提交
+3. 系统自动生成指令
+
+**方法2：运行测试脚本**
+
 ```bash
 cd backend
 python demo_commander.py
+```
+
+### 演示数据混乱
+
+点击右上角的"重置演示"按钮，清空所有动态数据。
+
+---
+
+## 详细文档
+
+- **[DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)**: 框架梳理与开发日志 ⭐ (推荐阅读)
+- **[QUICK_START.md](QUICK_START.md)**: 快速启动指南
+- **[CHECKLIST.md](CHECKLIST.md)**: 前后端联调检查清单
 ```
 
 ---

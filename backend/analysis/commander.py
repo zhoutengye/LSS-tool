@@ -272,22 +272,37 @@ class IntelligentCommander:
 
         Example:
             温度偏高 → R_E04_TEMP_HIGH
+            压力偏高 → R_E04_PRESSURE_HIGH
+            设备异常 → R_EQUIPMENT_ABNORMAL
             水分超标 → R_P01_MOISTURE_HIGH
         """
         param_code = issue.get("param_code")
         node_code = issue.get("node_code")
         severity = issue.get("severity")
 
+        # 处理P前缀的参数代码: P_E04_TEMP -> TEMP
+        if param_code and param_code.startswith("P_"):
+            # 提取参数类型: P_E04_TEMP -> TEMP
+            parts = param_code.split("_")
+            if len(parts) >= 3:
+                param_type = parts[-1]  # TEMP, PRESSURE, etc.
+            else:
+                param_type = param_code
+        else:
+            param_type = param_code
+
         # 简化版映射逻辑（实际应从知识图谱查询）
-        if param_code and "temp" in param_code.lower() and severity in ["CRITICAL", "HIGH"]:
+        if param_type == "TEMP" and severity in ["CRITICAL", "HIGH"]:
             return f"R_{node_code}_TEMP_HIGH"
-        elif param_code and "temp" in param_code.lower():
+        elif param_type == "TEMP" and severity == "MEDIUM":
             return f"R_{node_code}_TEMP_LOW"
-        elif param_code and "pressure" in param_code.lower():
+        elif param_type == "PRESSURE":
             return f"R_{node_code}_PRESSURE_HIGH"
-        elif param_code and "moisture" in param_code.lower():
+        elif param_type == "MOTOR_STATUS":
+            return "R_EQUIPMENT_ABNORMAL"
+        elif param_type and "MOISTURE" in param_type:
             return "R_P01_MOISTURE_HIGH"
-        elif param_code and "time" in param_code.lower():
+        elif param_type and "TIME" in param_type:
             return f"R_{node_code}_TIME_SHORT"
 
         return None
@@ -310,6 +325,7 @@ class IntelligentCommander:
             {suggested_valve}: 建议阀门开度
             {root_cause}: 根本原因
             {prob}: 概率
+            {error_code}: 错误代码
         """
         vars = {
             "node_name": issue.get("node_name", "未知工序"),
@@ -317,6 +333,7 @@ class IntelligentCommander:
             "target_value": issue.get("target_value", 0),
             "batch_id": issue.get("batch_id", ""),
             "cpk": issue.get("cpk", 0),
+            "error_code": issue.get("error_code", "UNKNOWN"),  # 添加错误代码
         }
 
         # 计算建议值（简化版）
@@ -327,10 +344,14 @@ class IntelligentCommander:
             vars["suggested_valve"] = suggested_valve
 
         # 提取根本原因（从 risk_assessments）
-        if report.risk_assessments:
+        if report and hasattr(report, 'risk_assessments') and report.risk_assessments:
             top_risk = report.risk_assessments[0]
             vars["root_cause"] = top_risk.get("risk_name", "设备异常")
             vars["prob"] = int(top_risk.get("probability", 0) * 100)
+        else:
+            # 如果没有报告，使用默认值
+            vars["root_cause"] = "设备异常"
+            vars["prob"] = 80
 
         return vars
 
@@ -467,3 +488,150 @@ class IntelligentCommander:
             inst.done_at = datetime.now()
             inst.feedback = feedback
             self.db.commit()
+
+    # ========================================
+    # Demo 演示专用接口
+    # ========================================
+
+    def generate_instructions_from_data(
+        self,
+        batch_id: str,
+        measurements: List[models.Measurement]
+    ) -> List[models.DailyInstruction]:
+        """
+        从测量数据直接生成指令（Demo演示用）
+
+        这是专门为下工填报单设计的接口：
+        1. 接收工人填写的测量数据
+        2. 快速分析数据，识别异常
+        3. 生成对应的指令
+
+        Args:
+            batch_id: 批次ID
+            measurements: 测量数据列表
+
+        Returns:
+            生成的指令列表
+        """
+        from datetime import datetime
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        instructions_generated = []
+
+        # 简化版：直接根据测量值判断异常
+        for meas in measurements:
+            node_code = meas.node_code
+            param_code = meas.param_code
+            value = float(meas.value)
+
+            # 根据参数类型判断是否异常
+            issue = None
+
+            # 处理P前缀的参数代码: P_E04_TEMP -> TEMP
+            if param_code.startswith("P_"):
+                # 提取参数类型: P_E04_TEMP -> TEMP
+                parts = param_code.split("_")
+                if len(parts) >= 3:
+                    param_type = parts[-1]  # TEMP, PRESSURE, etc.
+                else:
+                    param_type = param_code
+            else:
+                param_type = param_code
+
+            if param_type == "TEMP":
+                # 温度异常
+                if value > 90:
+                    issue = {
+                        "param_code": param_code,
+                        "node_code": node_code,
+                        "batch_id": batch_id,
+                        "severity": "CRITICAL",
+                        "current_value": value,
+                        "target_value": 82.0,
+                        "cpk": 0.6,
+                        "node_name": f"{node_code} 醇提罐"
+                    }
+                elif value > 85:
+                    issue = {
+                        "param_code": param_code,
+                        "node_code": node_code,
+                        "batch_id": batch_id,
+                        "severity": "HIGH",
+                        "current_value": value,
+                        "target_value": 82.0,
+                        "cpk": 0.95,
+                        "node_name": f"{node_code} 醇提罐"
+                    }
+
+            elif param_type == "PRESSURE":
+                # 压力异常
+                if value > 2.0:
+                    issue = {
+                        "param_code": param_code,
+                        "node_code": node_code,
+                        "batch_id": batch_id,
+                        "severity": "HIGH",
+                        "current_value": value,
+                        "target_value": 1.5,
+                        "cpk": 0.85,
+                        "node_name": f"{node_code} 醇提罐"
+                    }
+
+            elif param_code == "motor_status" and value == 0.0:
+                # 设备异常（0.0 表示 abnormal，1.0 表示 normal）
+                issue = {
+                    "param_code": param_code,
+                    "node_code": node_code,
+                    "batch_id": batch_id,
+                    "severity": "CRITICAL",
+                    "current_value": "异常",
+                    "target_value": "正常",
+                    "node_name": f"{node_code} 醇提罐",
+                    "error_code": "MOTOR_ABNORMAL"  # 添加错误代码
+                }
+
+            # 如果发现问题，生成指令
+            if issue:
+                # 映射到风险代码
+                risk_code = self._map_issue_to_risk_code(issue)
+
+                if risk_code:
+                    # 查询对策库
+                    actions = self.db.query(models.ActionDef).filter(
+                        models.ActionDef.risk_code == risk_code,
+                        models.ActionDef.active == True
+                    ).all()
+
+                    # 为每个对策生成指令
+                    for action in actions:
+                        template_vars = self._extract_template_vars(
+                            issue,
+                            None,  # 没有完整报告
+                            action
+                        )
+
+                        content = action.instruction_template.format(**template_vars)
+
+                        # 创建指令记录
+                        record = models.DailyInstruction(
+                            target_date=today,
+                            role=action.target_role,
+                            content=content,
+                            priority=action.priority,
+                            evidence=issue.get("evidence", {}),
+                            action_code=action.code,
+                            batch_id=batch_id,
+                            node_code=node_code,
+                            param_code=param_code,
+                            status="Pending"
+                        )
+
+                        self.db.add(record)
+                        instructions_generated.append(record)
+
+        # 提交到数据库
+        self.db.commit()
+
+        print(f"✅ 从 {len(measurements)} 条测量数据生成了 {len(instructions_generated)} 条指令")
+
+        return instructions_generated

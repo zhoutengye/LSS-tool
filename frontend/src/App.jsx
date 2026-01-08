@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Layout, Button, Tag, message, Switch, Space, Typography, Divider, Menu } from 'antd';
-import { ThunderboltOutlined, HistoryOutlined, ReloadOutlined, BarChartOutlined, HomeOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { Layout, Button, Tag, message, Switch, Space, Typography, Divider, Menu, Popconfirm } from 'antd';
+import { ThunderboltOutlined, HistoryOutlined, ReloadOutlined, BarChartOutlined, HomeOutlined, ExperimentOutlined, LoginOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import ProcessFlow from './components/ProcessFlow';
 import ActionList from './components/ActionList';
 import MonitorPanel from './components/MonitorPanel';
 import LSSToolsPage from './pages/LSSToolsPage';
 import IntelligentAnalysisPage from './pages/IntelligentAnalysisPage';
+import ShiftReportPage from './pages/ShiftReportPage';
+import WorkerLoginPage from './pages/WorkerLoginPage';
 
 const { Header, Content, Sider, Footer } = Layout;
 const { Text } = Typography;
 
 function App() {
   // 页面切换
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'lss-tools', or 'intelligent-analysis'
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'lss-tools', 'intelligent-analysis', 'shift-report', 'worker-login'
+  const [workerInfo, setWorkerInfo] = useState(null); // 登录后的工人信息
 
   // 系统状态
   const [status, setStatus] = useState("未连接");
@@ -99,6 +102,25 @@ function App() {
     }
   };
 
+  // 重置演示环境
+  const handleResetDemo = async () => {
+    try {
+      await axios.delete('http://127.0.0.1:8000/api/demo/reset');
+      message.success('演示环境已重置');
+      fetchInstructions(); // 刷新指令列表
+    } catch (err) {
+      message.error('重置失败');
+    }
+  };
+
+  // 工人登录成功
+  const handleLoginSuccess = (info) => {
+    setWorkerInfo(info);
+    setCurrentPage('home');
+    message.success('登录成功，已确认今日操作重点');
+    fetchInstructions(); // 刷新指令列表
+  };
+
   return (
     <Layout style={{ height: '100vh' }}>
       {/* 顶部导航栏 */}
@@ -140,9 +162,40 @@ function App() {
           >
             AI黑带专家
           </Button>
+          <Divider type="vertical" style={{ height: 24, borderColor: 'rgba(255,255,255,0.3)' }} />
+          {/* Demo 功能按钮 */}
+          <Button
+            type={currentPage === 'shift-report' ? 'primary' : 'text'}
+            icon={<EditOutlined />}
+            onClick={() => setCurrentPage('shift-report')}
+            style={{ color: currentPage === 'shift-report' ? 'white' : 'rgba(255,255,255,0.65)' }}
+          >
+            下工填报
+          </Button>
+          <Button
+            type={currentPage === 'worker-login' ? 'primary' : 'text'}
+            icon={<LoginOutlined />}
+            onClick={() => setCurrentPage('worker-login')}
+            style={{ color: currentPage === 'worker-login' ? 'white' : 'rgba(255,255,255,0.65)' }}
+          >
+            上工登录
+          </Button>
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Demo 重置按钮 */}
+          <Popconfirm
+            title="重置演示环境"
+            description="这将清空所有生产数据和指令，知识图谱保留。确定要重置吗？"
+            onConfirm={handleResetDemo}
+            okText="确定重置"
+            cancelText="取消"
+          >
+            <Button size="small" icon={<DeleteOutlined />} danger>
+              重置演示
+            </Button>
+          </Popconfirm>
+
           {/* 模式切换 */}
           <Space>
             <Text style={{ color: 'white', fontSize: '14px' }}>
@@ -174,6 +227,13 @@ function App() {
         <IntelligentAnalysisPage />
       ) : currentPage === 'lss-tools' ? (
         <LSSToolsPage />
+      ) : currentPage === 'shift-report' ? (
+        <ShiftReportPage onBack={() => setCurrentPage('home')} />
+      ) : currentPage === 'worker-login' ? (
+        <WorkerLoginPage
+          onLoginSuccess={handleLoginSuccess}
+          onBack={() => setCurrentPage('home')}
+        />
       ) : (
         <Layout>
         {/* 左侧：工艺流程图 */}
